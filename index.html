@@ -22,39 +22,29 @@
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
         }
-        .form-letter {
-            transition: transform 0.2s;
-        }
-        .form-letter:active {
-            transform: scale(0.95);
-        }
-        @keyframes slideIn {
-            from {
-                transform: translateY(100%);
-                opacity: 0;
+        @supports (orientation: landscape) {
+            @media (orientation: landscape) {
+                .landscape-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 1rem;
+                }
             }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        .slide-in {
-            animation: slideIn 0.3s ease-out;
-        }
-        @keyframes fillBar {
-            from {
-                width: 0%;
-            }
-            to {
-                width: var(--target-width);
-            }
-        }
-        .progress-bar {
-            animation: fillBar 0.8s ease-out forwards;
-            width: 0%;
         }
         .offline-banner {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .stat-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .compact-stat {
+            min-width: 0;
+            flex: 1;
         }
     </style>
 </head>
@@ -66,10 +56,9 @@
 
         const FootballPWA = () => {
             const [selectedLeague, setSelectedLeague] = useState('epl');
-            const [selectedMatch, setSelectedMatch] = useState(null);
-            const [activeTab, setActiveTab] = useState('recent');
             const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [installPrompt, setInstallPrompt] = useState(null);
+            const [expandedMatch, setExpandedMatch] = useState(null);
 
             useEffect(() => {
                 const handleOnline = () => setIsOnline(true);
@@ -99,14 +88,10 @@
             };
 
             // Calculate comprehensive goal statistics
-            const calculateGoalStats = (matches, isHome = true) => {
+            const calculateGoalStats = (matches) => {
                 const totalMatches = matches.length;
-                let over15 = 0;
-                let over25 = 0;
-                let over35 = 0;
                 let btts = 0;
-                let scored = 0;
-                let conceded = 0;
+                let over25 = 0;
                 let totalGoalsScored = 0;
                 let totalGoalsConceded = 0;
 
@@ -114,39 +99,21 @@
                     const [homeGoals, awayGoals] = match.score.split('-').map(Number);
                     const totalGoals = homeGoals + awayGoals;
                     
-                    // Determine which side this team was on
                     const teamGoals = match.venue === 'home' ? homeGoals : awayGoals;
                     const opponentGoals = match.venue === 'home' ? awayGoals : homeGoals;
                     
-                    // Over goals calculations
-                    if (totalGoals > 1.5) over15++;
                     if (totalGoals > 2.5) over25++;
-                    if (totalGoals > 3.5) over35++;
-                    
-                    // BTTS - Both teams scored
                     if (homeGoals > 0 && awayGoals > 0) btts++;
                     
-                    // Scored in match
-                    if (teamGoals > 0) scored++;
-                    
-                    // Conceded in match
-                    if (opponentGoals > 0) conceded++;
-                    
-                    // Totals for averages
                     totalGoalsScored += teamGoals;
                     totalGoalsConceded += opponentGoals;
                 });
 
                 return {
-                    over15: Math.round((over15 / totalMatches) * 100),
-                    over25: Math.round((over25 / totalMatches) * 100),
-                    over35: Math.round((over35 / totalMatches) * 100),
                     btts: Math.round((btts / totalMatches) * 100),
-                    scored: Math.round((scored / totalMatches) * 100),
-                    conceded: Math.round((conceded / totalMatches) * 100),
+                    over25: Math.round((over25 / totalMatches) * 100),
                     avgScored: (totalGoalsScored / totalMatches).toFixed(1),
                     avgConceded: (totalGoalsConceded / totalMatches).toFixed(1),
-                    totalMatches
                 };
             };
 
@@ -185,11 +152,6 @@
                                     { vs: 'Fulham', score: '1-2', result: 'L', venue: 'away' }
                                 ]
                             },
-                            headToHead: [
-                                { date: 'Sep 22, 2025', home: 'Man City', away: 'Arsenal', score: '2-2' },
-                                { date: 'Apr 28, 2025', home: 'Arsenal', away: 'Man City', score: '1-0' },
-                                { date: 'Dec 31, 2024', home: 'Man City', away: 'Arsenal', score: '1-1' }
-                            ]
                         },
                         {
                             id: 2,
@@ -221,11 +183,6 @@
                                     { vs: 'West Ham', score: '0-2', result: 'L', venue: 'away' }
                                 ]
                             },
-                            headToHead: [
-                                { date: 'Oct 20, 2025', home: 'Chelsea', away: 'Liverpool', score: '1-2' },
-                                { date: 'Aug 18, 2025', home: 'Liverpool', away: 'Chelsea', score: '2-0' },
-                                { date: 'Jan 31, 2025', home: 'Chelsea', away: 'Liverpool', score: '0-0' }
-                            ]
                         },
                         {
                             id: 3,
@@ -257,11 +214,6 @@
                                     { vs: 'West Ham', score: '0-2', result: 'L', venue: 'away' }
                                 ]
                             },
-                            headToHead: [
-                                { date: 'Sep 29, 2025', home: 'Tottenham', away: 'Man United', score: '0-3' },
-                                { date: 'May 12, 2025', home: 'Man United', away: 'Tottenham', score: '2-2' },
-                                { date: 'Jan 14, 2025', home: 'Tottenham', away: 'Man United', score: '2-0' }
-                            ]
                         }
                     ]
                 },
@@ -299,11 +251,6 @@
                                     { vs: 'Girona', score: '2-1', result: 'W', venue: 'away' }
                                 ]
                             },
-                            headToHead: [
-                                { date: 'Oct 26, 2025', home: 'Barcelona', away: 'Real Madrid', score: '0-4' },
-                                { date: 'Apr 21, 2025', home: 'Real Madrid', away: 'Barcelona', score: '3-2' },
-                                { date: 'Oct 28, 2024', home: 'Barcelona', away: 'Real Madrid', score: '1-2' }
-                            ]
                         },
                         {
                             id: 5,
@@ -335,11 +282,6 @@
                                     { vs: 'Getafe', score: '1-2', result: 'L', venue: 'away' }
                                 ]
                             },
-                            headToHead: [
-                                { date: 'Oct 05, 2025', home: 'Sevilla', away: 'Atletico Madrid', score: '1-1' },
-                                { date: 'Apr 02, 2025', home: 'Atletico Madrid', away: 'Sevilla', score: '2-0' },
-                                { date: 'Dec 08, 2024', home: 'Sevilla', away: 'Atletico Madrid', score: '1-4' }
-                            ]
                         }
                     ]
                 }
@@ -347,139 +289,175 @@
 
             const currentMatches = leagues[selectedLeague].matches;
 
-            const getResultColor = (result) => {
-                if (result === 'W') return 'bg-green-500';
-                if (result === 'D') return 'bg-yellow-500';
-                return 'bg-red-500';
-            };
-
-            const getPercentageColor = (percentage) => {
-                if (percentage >= 80) return 'from-green-500 to-green-600';
-                if (percentage >= 60) return 'from-blue-500 to-blue-600';
-                if (percentage >= 40) return 'from-yellow-500 to-yellow-600';
-                return 'from-red-500 to-red-600';
-            };
-
             const StatusBadge = ({ status }) => {
-                if (status === 'final') return <span className="px-2 py-1 bg-gray-700 text-white text-xs rounded-full font-medium">FT</span>;
-                if (status === 'upcoming') return <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full font-medium">Upcoming</span>;
-                return <span className="px-2 py-1 bg-green-600 text-white text-xs rounded-full font-medium">Live</span>;
+                if (status === 'final') return <span className="stat-pill bg-gray-700 text-white">FT</span>;
+                if (status === 'upcoming') return <span className="stat-pill bg-blue-600 text-white">Upcoming</span>;
+                return <span className="stat-pill bg-green-600 text-white">Live</span>;
             };
 
-            const StatBar = ({ label, percentage, icon }) => (
-                <div>
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                            {icon} {label}
-                        </span>
-                        <span className="text-sm font-bold text-gray-900">{percentage}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                        <div 
-                            className={`progress-bar h-2.5 rounded-full bg-gradient-to-r ${getPercentageColor(percentage)} shadow-sm`}
-                            style={{'--target-width': `${percentage}%`}}
-                        ></div>
-                    </div>
+            const StatPill = ({ label, value, color = "gray" }) => (
+                <div className={`stat-pill bg-${color}-100 text-${color}-700 border border-${color}-300`}>
+                    <span className="opacity-75 mr-1">{label}:</span>
+                    <span className="font-bold">{value}</span>
                 </div>
             );
 
-            const GoalStatsDisplay = ({ stats, teamName, venue }) => (
-                <div className="space-y-4">
-                    {/* Averages Box */}
-                    <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-4 shadow-lg text-white">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="text-center">
-                                <div className="text-3xl font-bold">{stats.avgScored}</div>
-                                <div className="text-xs opacity-90 mt-1">Avg Goals Scored</div>
+            const CompactMatchCard = ({ match }) => {
+                const homeStats = calculateGoalStats(match.homeForm.lastFive);
+                const awayStats = calculateGoalStats(match.awayForm.lastFive);
+                const isExpanded = expandedMatch === match.id;
+
+                return (
+                    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                        {/* Match Header */}
+                        <div className="p-4 border-b border-gray-200">
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="text-xs text-gray-500">📅 {match.date}</div>
+                                <StatusBadge status={match.status} />
                             </div>
-                            <div className="text-center">
-                                <div className="text-3xl font-bold">{stats.avgConceded}</div>
-                                <div className="text-xs opacity-90 mt-1">Avg Goals Conceded</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Stats Bars */}
-                    <div className="bg-white rounded-xl p-4 shadow-md space-y-4">
-                        <StatBar label="Both Teams Score" percentage={stats.btts} icon="⚽" />
-                        <StatBar label="Team Scored" percentage={stats.scored} icon="🎯" />
-                        <StatBar label="Team Conceded" percentage={stats.conceded} icon="🥅" />
-                    </div>
-
-                    {/* Over Goals */}
-                    <div className="bg-white rounded-xl p-4 shadow-md space-y-4">
-                        <h5 className="font-semibold text-sm text-gray-700 mb-3">Total Goals in Match</h5>
-                        <StatBar label="Over 1.5 Goals" percentage={stats.over15} icon="📊" />
-                        <StatBar label="Over 2.5 Goals" percentage={stats.over25} icon="📈" />
-                        <StatBar label="Over 3.5 Goals" percentage={stats.over35} icon="🔥" />
-                    </div>
-
-                    {/* Info */}
-                    <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600">
-                        <div className="font-semibold mb-1">📌 Based on last 5 {venue} matches</div>
-                        <div>All percentages calculated from {stats.totalMatches} matches</div>
-                    </div>
-                </div>
-            );
-
-            const FormDisplay = ({ form, label, icon }) => (
-                <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                        <span className="text-lg">{icon}</span>
-                        <h4 className="font-semibold text-sm text-gray-700">{label}</h4>
-                    </div>
-                    <div className="flex gap-1.5">
-                        {form.split('').map((result, idx) => (
-                            <div
-                                key={idx}
-                                className={`form-letter flex-1 h-10 ${getResultColor(result)} text-white text-sm font-bold rounded-lg flex items-center justify-center shadow-sm`}
-                            >
-                                {result}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            const RecentMatchesList = ({ matches }) => (
-                <div className="space-y-2">
-                    {matches.map((match, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm active:bg-gray-50">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className={`w-8 h-8 flex-shrink-0 ${getResultColor(match.result)} text-white text-xs font-bold rounded-lg flex items-center justify-center shadow-sm`}>
-                                    {match.result}
+                            
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="font-bold text-gray-800">{match.home}</div>
+                                    {match.status === 'final' && (
+                                        <div className="text-xl font-bold text-blue-600">{match.homeScore}</div>
+                                    )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-sm truncate">{match.venue === 'home' ? 'vs' : '@'} {match.vs}</div>
-                                    <div className="text-xs text-gray-500">{match.venue === 'home' ? '🏠 Home' : '✈️ Away'}</div>
+                                
+                                <div className="flex items-center justify-between">
+                                    <div className="font-bold text-gray-800">{match.away}</div>
+                                    {match.status === 'final' && (
+                                        <div className="text-xl font-bold text-blue-600">{match.awayScore}</div>
+                                    )}
                                 </div>
                             </div>
-                            <div className="font-bold text-sm text-gray-800 ml-2">{match.score}</div>
                         </div>
-                    ))}
-                </div>
-            );
+
+                        {/* Quick Stats - Always Visible */}
+                        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <div className="grid grid-cols-2 gap-3">
+                                {/* Home Team Stats */}
+                                <div className="space-y-1">
+                                    <div className="text-xs font-semibold text-gray-600 mb-1.5">🏠 {match.home}</div>
+                                    <div className="flex flex-wrap gap-1">
+                                        <StatPill label="Avg" value={homeStats.avgScored} color="green" />
+                                        <StatPill label="O2.5" value={`${homeStats.over25}%`} color="blue" />
+                                        <StatPill label="BTTS" value={`${homeStats.btts}%`} color="purple" />
+                                    </div>
+                                </div>
+
+                                {/* Away Team Stats */}
+                                <div className="space-y-1">
+                                    <div className="text-xs font-semibold text-gray-600 mb-1.5">✈️ {match.away}</div>
+                                    <div className="flex flex-wrap gap-1">
+                                        <StatPill label="Avg" value={awayStats.avgScored} color="green" />
+                                        <StatPill label="O2.5" value={`${awayStats.over25}%`} color="blue" />
+                                        <StatPill label="BTTS" value={`${awayStats.btts}%`} color="purple" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Expand Button */}
+                        <button
+                            onClick={() => setExpandedMatch(isExpanded ? null : match.id)}
+                            className="w-full py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
+                        >
+                            {isExpanded ? '▲ Hide Details' : '▼ Show More Stats'}
+                        </button>
+
+                        {/* Expanded Details */}
+                        {isExpanded && (
+                            <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-4">
+                                {/* Home Team Detailed */}
+                                <div>
+                                    <div className="font-bold text-sm text-gray-700 mb-2">🏠 {match.home} - Last 5 Home</div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">Avg Scored</div>
+                                            <div className="text-lg font-bold text-green-600">{homeStats.avgScored}</div>
+                                        </div>
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">Avg Conceded</div>
+                                            <div className="text-lg font-bold text-red-600">{homeStats.avgConceded}</div>
+                                        </div>
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">Over 2.5</div>
+                                            <div className="text-lg font-bold text-blue-600">{homeStats.over25}%</div>
+                                        </div>
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">BTTS</div>
+                                            <div className="text-lg font-bold text-purple-600">{homeStats.btts}%</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 text-xs text-gray-600">
+                                        Form: {match.homeForm.home.split('').map((f, i) => (
+                                            <span key={i} className={`inline-block w-5 h-5 text-center rounded ml-0.5 ${
+                                                f === 'W' ? 'bg-green-500 text-white' : 
+                                                f === 'D' ? 'bg-yellow-500 text-white' : 
+                                                'bg-red-500 text-white'
+                                            }`}>{f}</span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Away Team Detailed */}
+                                <div>
+                                    <div className="font-bold text-sm text-gray-700 mb-2">✈️ {match.away} - Last 5 Away</div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">Avg Scored</div>
+                                            <div className="text-lg font-bold text-green-600">{awayStats.avgScored}</div>
+                                        </div>
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">Avg Conceded</div>
+                                            <div className="text-lg font-bold text-red-600">{awayStats.avgConceded}</div>
+                                        </div>
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">Over 2.5</div>
+                                            <div className="text-lg font-bold text-blue-600">{awayStats.over25}%</div>
+                                        </div>
+                                        <div className="bg-white p-2 rounded">
+                                            <div className="text-gray-500">BTTS</div>
+                                            <div className="text-lg font-bold text-purple-600">{awayStats.btts}%</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 text-xs text-gray-600">
+                                        Form: {match.awayForm.away.split('').map((f, i) => (
+                                            <span key={i} className={`inline-block w-5 h-5 text-center rounded ml-0.5 ${
+                                                f === 'W' ? 'bg-green-500 text-white' : 
+                                                f === 'D' ? 'bg-yellow-500 text-white' : 
+                                                'bg-red-500 text-white'
+                                            }`}>{f}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            };
 
             return (
                 <div className="min-h-screen pb-6">
                     {/* Offline Banner */}
                     {!isOnline && (
                         <div className="offline-banner text-white p-3 text-center text-sm font-medium shadow-lg">
-                            📡 Offline Mode - Showing cached data
+                            📡 Offline Mode
                         </div>
                     )}
 
                     {/* Install Banner */}
                     {installPrompt && (
-                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 shadow-lg">
-                            <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                    <p className="font-semibold text-sm mb-1">Install Football Stats</p>
-                                    <p className="text-xs opacity-90">Add to home screen for quick access</p>
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 shadow-lg">
+                            <div className="flex items-center justify-between max-w-4xl mx-auto px-2">
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm">Install Football Stats</p>
+                                    <p className="text-xs opacity-90">Quick access from home screen</p>
                                 </div>
                                 <button
                                     onClick={handleInstallClick}
-                                    className="ml-3 px-4 py-2 bg-white text-blue-600 rounded-lg font-semibold text-sm shadow-md active:scale-95 transition-transform"
+                                    className="ml-3 px-3 py-1.5 bg-white text-blue-600 rounded-lg font-semibold text-sm shadow-md active:scale-95 transition-transform flex-shrink-0"
                                 >
                                     Install
                                 </button>
@@ -487,243 +465,55 @@
                         </div>
                     )}
 
-                    <div className="max-w-2xl mx-auto px-4 pt-6">
+                    <div className="max-w-4xl mx-auto px-3 pt-4">
                         {/* Header */}
-                        <div className="bg-white rounded-2xl shadow-xl p-5 mb-4">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="text-3xl">⚽</div>
-                                <h1 className="text-2xl font-bold text-gray-800">Football Stats</h1>
+                        <div className="bg-white rounded-2xl shadow-xl p-4 mb-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="text-2xl">⚽</div>
+                                <h1 className="text-xl font-bold text-gray-800">Football Stats</h1>
                             </div>
                             
                             {/* League Selector */}
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => {
-                                        setSelectedLeague('epl');
-                                        setSelectedMatch(null);
-                                    }}
-                                    className={`flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all active:scale-95 ${
+                                    onClick={() => setSelectedLeague('epl')}
+                                    className={`flex-1 px-3 py-2 rounded-xl font-semibold text-sm transition-all active:scale-95 ${
                                         selectedLeague === 'epl'
                                             ? 'bg-blue-600 text-white shadow-lg'
                                             : 'bg-gray-100 text-gray-700'
                                     }`}
                                 >
-                                    {leagues.epl.flag} {leagues.epl.name}
+                                    {leagues.epl.flag} EPL
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        setSelectedLeague('laliga');
-                                        setSelectedMatch(null);
-                                    }}
-                                    className={`flex-1 px-4 py-3 rounded-xl font-semibold text-sm transition-all active:scale-95 ${
+                                    onClick={() => setSelectedLeague('laliga')}
+                                    className={`flex-1 px-3 py-2 rounded-xl font-semibold text-sm transition-all active:scale-95 ${
                                         selectedLeague === 'laliga'
                                             ? 'bg-blue-600 text-white shadow-lg'
                                             : 'bg-gray-100 text-gray-700'
                                     }`}
                                 >
-                                    {leagues.laliga.flag} {leagues.laliga.name}
+                                    {leagues.laliga.flag} La Liga
                                 </button>
                             </div>
                         </div>
 
-                        {/* Matches List */}
-                        {!selectedMatch && (
-                            <div className="space-y-3">
-                                {currentMatches.map((match) => (
-                                    <div
-                                        key={match.id}
-                                        onClick={() => setSelectedMatch(match)}
-                                        className="bg-white rounded-2xl shadow-lg p-4 active:scale-98 transition-transform"
-                                    >
-                                        <div className="flex justify-between items-center mb-3">
-                                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                📅 {match.date}
-                                            </div>
-                                            <StatusBadge status={match.status} />
-                                        </div>
-                                        
-                                        <div className="space-y-2.5">
-                                            <div className="flex items-center justify-between">
-                                                <div className="font-semibold text-gray-800">{match.home}</div>
-                                                {match.status === 'final' && (
-                                                    <div className="text-2xl font-bold text-blue-600">{match.homeScore}</div>
-                                                )}
-                                            </div>
-                                            
-                                            <div className="flex items-center justify-between">
-                                                <div className="font-semibold text-gray-800">{match.away}</div>
-                                                {match.status === 'final' && (
-                                                    <div className="text-2xl font-bold text-blue-600">{match.awayScore}</div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-center text-blue-600 text-sm font-medium">
-                                            View Full Stats →
-                                        </div>
-                                    </div>
-                                ))}
+                        {/* Legend */}
+                        <div className="bg-white rounded-xl shadow-md p-3 mb-4 text-xs">
+                            <div className="font-semibold text-gray-700 mb-2">📊 Quick Stats Guide:</div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div><span className="font-bold">Avg</span> - Goals per game</div>
+                                <div><span className="font-bold">O2.5</span> - Over 2.5 goals %</div>
+                                <div><span className="font-bold">BTTS</span> - Both teams score %</div>
                             </div>
-                        )}
+                        </div>
 
-                        {/* Match Details */}
-                        {selectedMatch && (
-                            <div className="slide-in">
-                                <button
-                                    onClick={() => setSelectedMatch(null)}
-                                    className="mb-4 px-4 py-2.5 bg-white rounded-xl font-medium text-sm shadow-md active:scale-95 transition-transform flex items-center gap-2"
-                                >
-                                    ← Back to Matches
-                                </button>
-
-                                <div className="bg-white rounded-2xl shadow-xl p-5 mb-4">
-                                    <h2 className="text-xl font-bold text-gray-800 mb-2">
-                                        {selectedMatch.home} vs {selectedMatch.away}
-                                    </h2>
-                                    <div className="flex items-center gap-3 text-sm text-gray-600">
-                                        📅 {selectedMatch.date}
-                                        {selectedMatch.status === 'final' && (
-                                            <span className="ml-2 font-bold text-lg text-blue-600">
-                                                {selectedMatch.homeScore} - {selectedMatch.awayScore}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Tabs */}
-                                <div className="flex gap-2 mb-4">
-                                    <button
-                                        onClick={() => setActiveTab('recent')}
-                                        className={`flex-1 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
-                                            activeTab === 'recent'
-                                                ? 'bg-blue-600 text-white shadow-lg'
-                                                : 'bg-white text-gray-600 shadow-md'
-                                        }`}
-                                    >
-                                        📊 Form
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('goals')}
-                                        className={`flex-1 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
-                                            activeTab === 'goals'
-                                                ? 'bg-blue-600 text-white shadow-lg'
-                                                : 'bg-white text-gray-600 shadow-md'
-                                        }`}
-                                    >
-                                        ⚽ Goals
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('h2h')}
-                                        className={`flex-1 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
-                                            activeTab === 'h2h'
-                                                ? 'bg-blue-600 text-white shadow-lg'
-                                                : 'bg-white text-gray-600 shadow-md'
-                                        }`}
-                                    >
-                                        🔄 H2H
-                                    </button>
-                                </div>
-
-                                {activeTab === 'recent' && (
-                                    <div className="space-y-6">
-                                        {/* Home Team */}
-                                        <div className="space-y-3">
-                                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 px-2">
-                                                🏠 {selectedMatch.home}
-                                            </h3>
-                                            
-                                            <FormDisplay 
-                                                form={selectedMatch.homeForm.overall} 
-                                                label="Overall Form"
-                                                icon="📈"
-                                            />
-                                            
-                                            <FormDisplay 
-                                                form={selectedMatch.homeForm.home} 
-                                                label="Home Form"
-                                                icon="🏠"
-                                            />
-                                            
-                                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4">
-                                                <h4 className="font-semibold text-sm text-gray-700 mb-3">Last 5 Home Matches</h4>
-                                                <RecentMatchesList matches={selectedMatch.homeForm.lastFive} />
-                                            </div>
-                                        </div>
-
-                                        {/* Away Team */}
-                                        <div className="space-y-3">
-                                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 px-2">
-                                                ✈️ {selectedMatch.away}
-                                            </h3>
-                                            
-                                            <FormDisplay 
-                                                form={selectedMatch.awayForm.overall} 
-                                                label="Overall Form"
-                                                icon="📈"
-                                            />
-                                            
-                                            <FormDisplay 
-                                                form={selectedMatch.awayForm.away} 
-                                                label="Away Form"
-                                                icon="✈️"
-                                            />
-                                            
-                                            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4">
-                                                <h4 className="font-semibold text-sm text-gray-700 mb-3">Last 5 Away Matches</h4>
-                                                <RecentMatchesList matches={selectedMatch.awayForm.lastFive} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {activeTab === 'goals' && (
-                                    <div className="space-y-6">
-                                        {/* Home Team Goal Stats */}
-                                        <div className="space-y-3">
-                                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 px-2">
-                                                🏠 {selectedMatch.home} - Home Stats
-                                            </h3>
-                                            <GoalStatsDisplay 
-                                                stats={calculateGoalStats(selectedMatch.homeForm.lastFive, true)}
-                                                teamName={selectedMatch.home}
-                                                venue="home"
-                                            />
-                                        </div>
-
-                                        {/* Away Team Goal Stats */}
-                                        <div className="space-y-3">
-                                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 px-2">
-                                                ✈️ {selectedMatch.away} - Away Stats
-                                            </h3>
-                                            <GoalStatsDisplay 
-                                                stats={calculateGoalStats(selectedMatch.awayForm.lastFive, false)}
-                                                teamName={selectedMatch.away}
-                                                venue="away"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {activeTab === 'h2h' && (
-                                    <div className="space-y-3">
-                                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2 px-2 mb-4">
-                                            🔄 Previous Meetings
-                                        </h3>
-                                        {selectedMatch.headToHead.map((h2h, idx) => (
-                                            <div key={idx} className="bg-white rounded-2xl p-4 shadow-md">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex-1">
-                                                        <div className="font-medium text-xs text-gray-500 mb-1">{h2h.date}</div>
-                                                        <div className="font-semibold text-sm">{h2h.home} vs {h2h.away}</div>
-                                                    </div>
-                                                    <div className="text-2xl font-bold text-blue-600 ml-3">{h2h.score}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {/* Matches Grid - Responsive for landscape */}
+                        <div className="landscape-grid space-y-4">
+                            {currentMatches.map((match) => (
+                                <CompactMatchCard key={match.id} match={match} />
+                            ))}
+                        </div>
                     </div>
                 </div>
             );
@@ -741,7 +531,7 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swCode = `
-                    const CACHE_NAME = 'football-stats-v3';
+                    const CACHE_NAME = 'football-stats-v4';
                     const urlsToCache = ['/'];
                     
                     self.addEventListener('install', event => {
