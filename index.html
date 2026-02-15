@@ -25,16 +25,14 @@
         const { useState, useEffect } = React;
 
         const FootballApp = () => {
-            const [selectedLeague, setSelectedLeague] = useState('');
+            const [selectedLeague, setSelectedLeague] = useState('PL');
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [matches, setMatches] = useState([]);
-            const [leagues, setLeagues] = useState({});
             const [loading, setLoading] = useState(false);
-            const [loadingLeagues, setLoadingLeagues] = useState(false);
             const [error, setError] = useState(null);
             const [debugInfo, setDebugInfo] = useState('');
-            const [apiKey, setApiKey] = useState(localStorage.getItem('livescore6ApiKey') || '');
-            const [showApiInput, setShowApiInput] = useState(!localStorage.getItem('livescore6ApiKey'));
+            const [apiKey, setApiKey] = useState(localStorage.getItem('footballDataApiKey') || '');
+            const [showApiInput, setShowApiInput] = useState(!localStorage.getItem('footballDataApiKey'));
 
             const getDates = () => {
                 const dates = [];
@@ -52,93 +50,20 @@
 
             const dates = getDates();
 
-            // Fetch available leagues
-            const fetchLeagues = async () => {
-                if (!apiKey) return;
-                
-                setLoadingLeagues(true);
-                setDebugInfo('Fetching available leagues...');
-                
-                try {
-                    const response = await fetch('https://livescore6.p.rapidapi.com/leagues/v2/list', {
-                        method: 'GET',
-                        headers: {
-                            'X-RapidAPI-Key': apiKey,
-                            'X-RapidAPI-Host': 'livescore6.p.rapidapi.com'
-                        }
-                    });
-
-                    const data = await response.json();
-                    
-                    if (!response.ok) {
-                        throw new Error(`API Error: ${response.status} - ${data.message || 'Unknown error'}`);
-                    }
-
-                    // Parse leagues from response
-                    const leagueMap = {};
-                    if (data && data.data) {
-                        // Look for specific leagues we want
-                        const targetLeagues = [
-                            'Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1',
-                            'Eredivisie', 'Eerste Divisie', 'Championship', 'Liga Portugal'
-                        ];
-
-                        data.data.forEach(league => {
-                            if (league && league.name) {
-                                const leagueName = league.name;
-                                // Add all leagues but prioritize our targets
-                                if (targetLeagues.some(target => leagueName.includes(target))) {
-                                    leagueMap[league.id] = {
-                                        name: leagueName,
-                                        flag: getLeagueFlag(leagueName)
-                                    };
-                                }
-                            }
-                        });
-                    }
-
-                    setLeagues(leagueMap);
-                    
-                    // Auto-select first league
-                    const firstLeagueId = Object.keys(leagueMap)[0];
-                    if (firstLeagueId) {
-                        setSelectedLeague(firstLeagueId);
-                    }
-                    
-                    setDebugInfo(`Found ${Object.keys(leagueMap).length} leagues`);
-                } catch (err) {
-                    console.error('League fetch error:', err);
-                    setDebugInfo(`Error fetching leagues: ${err.message}`);
-                    
-                    // Fallback to hardcoded leagues
-                    setLeagues({
-                        '1': { name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-                        '2': { name: 'La Liga', flag: '🇪🇸' },
-                        '3': { name: 'Serie A', flag: '🇮🇹' },
-                        '4': { name: 'Bundesliga', flag: '🇩🇪' },
-                        '5': { name: 'Ligue 1', flag: '🇫🇷' },
-                    });
-                    setSelectedLeague('1');
-                } finally {
-                    setLoadingLeagues(false);
-                }
+            const leagues = {
+                'PL': { name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', code: 'PL' },
+                'PD': { name: 'La Liga', flag: '🇪🇸', code: 'PD' },
+                'SA': { name: 'Serie A', flag: '🇮🇹', code: 'SA' },
+                'BL1': { name: 'Bundesliga', flag: '🇩🇪', code: 'BL1' },
+                'FL1': { name: 'Ligue 1', flag: '🇫🇷', code: 'FL1' },
+                'DED': { name: 'Eredivisie', flag: '🇳🇱', code: 'DED' },
+                'PPL': { name: 'Primeira Liga', flag: '🇵🇹', code: 'PPL' },
+                'ELC': { name: 'Championship', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', code: 'ELC' },
             };
 
-            const getLeagueFlag = (leagueName) => {
-                if (leagueName.includes('Premier League') || leagueName.includes('Championship')) return '🏴󠁧󠁢󠁥󠁮󠁧󠁿';
-                if (leagueName.includes('La Liga')) return '🇪🇸';
-                if (leagueName.includes('Serie A')) return '🇮🇹';
-                if (leagueName.includes('Bundesliga')) return '🇩🇪';
-                if (leagueName.includes('Ligue 1')) return '🇫🇷';
-                if (leagueName.includes('Eredivisie') || leagueName.includes('Eerste Divisie')) return '🇳🇱';
-                if (leagueName.includes('Liga Portugal')) return '🇵🇹';
-                return '⚽';
-            };
-
-            // Fetch matches
             const fetchMatches = async () => {
-                if (!apiKey || !selectedLeague) {
-                    setError('Please enter API key and select a league');
+                if (!apiKey) {
+                    setError('Please enter your API key');
                     return;
                 }
 
@@ -147,45 +72,40 @@
                 setDebugInfo('');
                 
                 try {
-                    // LiveScore6 uses different endpoint structure
-                    const url = `https://livescore6.p.rapidapi.com/matches/v2/list-by-date?Category=soccer&Date=${selectedDate}`;
+                    const url = `https://api.football-data.org/v4/competitions/${selectedLeague}/matches?dateFrom=${selectedDate}&dateTo=${selectedDate}`;
                     
-                    setDebugInfo(`Fetching matches for ${selectedDate}...`);
+                    setDebugInfo(`Fetching ${leagues[selectedLeague].name} matches for ${selectedDate}...`);
 
                     const response = await fetch(url, {
                         method: 'GET',
                         headers: {
-                            'X-RapidAPI-Key': apiKey,
-                            'X-RapidAPI-Host': 'livescore6.p.rapidapi.com'
+                            'X-Auth-Token': apiKey
                         }
                     });
 
+                    if (response.status === 403) {
+                        throw new Error('Invalid API key. Please check your key from football-data.org');
+                    }
+
+                    if (response.status === 429) {
+                        throw new Error('Rate limit exceeded. Please wait a minute and try again.');
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.status}`);
+                    }
+
                     const data = await response.json();
                     
-                    if (!response.ok) {
-                        throw new Error(`API Error: ${response.status} - Check your API key and subscription`);
+                    if (data.matches) {
+                        setMatches(data.matches);
+                        localStorage.setItem('footballDataApiKey', apiKey);
+                        setShowApiInput(false);
+                        setDebugInfo(`Found ${data.matches.length} match${data.matches.length !== 1 ? 'es' : ''}`);
+                    } else {
+                        setMatches([]);
+                        setDebugInfo('No matches found');
                     }
-
-                    // Parse matches from response
-                    let allMatches = [];
-                    if (data && data.Stages) {
-                        data.Stages.forEach(stage => {
-                            if (stage.Events) {
-                                allMatches = allMatches.concat(stage.Events);
-                            }
-                        });
-                    }
-
-                    // Filter by selected league if we have league data
-                    const filteredMatches = selectedLeague ? 
-                        allMatches.filter(match => match.LeagueId === selectedLeague) : 
-                        allMatches;
-
-                    setMatches(filteredMatches);
-                    localStorage.setItem('livescore6ApiKey', apiKey);
-                    setShowApiInput(false);
-                    
-                    setDebugInfo(`Found ${filteredMatches.length} matches for this date`);
                     
                 } catch (err) {
                     console.error('Fetch error:', err);
@@ -197,13 +117,7 @@
             };
 
             useEffect(() => {
-                if (apiKey && !showApiInput) {
-                    fetchLeagues();
-                }
-            }, [apiKey, showApiInput]);
-
-            useEffect(() => {
-                if (apiKey && selectedLeague) {
+                if (apiKey) {
                     fetchMatches();
                 }
             }, [selectedLeague, selectedDate]);
@@ -217,27 +131,39 @@
                 over15: 80, over25: 60, over35: 40, btts: 65, scored: 85, conceded: 60
             });
 
+            const StatusBadge = ({ status }) => {
+                const statusMap = {
+                    'SCHEDULED': { label: 'Upcoming', color: 'bg-blue-600' },
+                    'TIMED': { label: 'Upcoming', color: 'bg-blue-600' },
+                    'IN_PLAY': { label: 'Live', color: 'bg-green-600' },
+                    'PAUSED': { label: 'HT', color: 'bg-yellow-600' },
+                    'FINISHED': { label: 'FT', color: 'bg-gray-700' },
+                };
+                
+                const info = statusMap[status] || { label: status, color: 'bg-gray-600' };
+                return <span className={`px-2 py-1 ${info.color} text-white text-xs rounded-full font-medium`}>{info.label}</span>;
+            };
+
             const MatchCard = ({ match }) => {
                 const prob = calculateProbabilities();
                 const homeStats = getTeamStats();
                 const awayStats = getTeamStats();
 
-                // Parse LiveScore6 match data
-                const homeTeam = match.T1 ? match.T1[0] : {};
-                const awayTeam = match.T2 ? match.T2[0] : {};
-                const homeScore = match.Tr1 || null;
-                const awayScore = match.Tr2 || null;
-                const status = match.Eps || 'NS';
-                const matchTime = match.Esd ? new Date(match.Esd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+                const homeTeam = match.homeTeam?.name || 'Home';
+                const awayTeam = match.awayTeam?.name || 'Away';
+                const homeScore = match.score?.fullTime?.home;
+                const awayScore = match.score?.fullTime?.away;
+                const status = match.status;
+                const matchTime = match.utcDate ? new Date(match.utcDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
 
                 return (
                     <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4">
                         <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                             <div className="text-sm font-semibold">⏰ {matchTime}</div>
-                            <span className="px-2 py-1 bg-white bg-opacity-20 text-white text-xs rounded-full">{status}</span>
+                            <StatusBadge status={status} />
                         </div>
 
-                        {status === 'NS' && (
+                        {(status === 'SCHEDULED' || status === 'TIMED') && (
                             <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-gray-200">
                                 <div className="text-xs font-bold text-gray-700 mb-2 text-center">🎯 PREDICTIONS</div>
                                 
@@ -290,7 +216,7 @@
                                 <tbody>
                                     <tr className="border-b border-gray-200 hover:bg-blue-50">
                                         <td className="team-cell text-left">
-                                            <span className="text-blue-700">🏠 {homeTeam.Nm || 'Home Team'}</span>
+                                            <span className="text-blue-700">🏠 {homeTeam}</span>
                                         </td>
                                         <td className="stat-cell text-blue-700">{homeStats.over15}%</td>
                                         <td className="stat-cell text-blue-700">{homeStats.over25}%</td>
@@ -305,7 +231,7 @@
 
                                     <tr className="hover:bg-red-50">
                                         <td className="team-cell text-left">
-                                            <span className="text-red-700">✈️ {awayTeam.Nm || 'Away Team'}</span>
+                                            <span className="text-red-700">✈️ {awayTeam}</span>
                                         </td>
                                         <td className="stat-cell text-blue-700">{awayStats.over15}%</td>
                                         <td className="stat-cell text-blue-700">{awayStats.over25}%</td>
@@ -320,6 +246,12 @@
                                 </tbody>
                             </table>
                         </div>
+
+                        {match.venue && (
+                            <div className="p-2 bg-gray-50 text-xs text-gray-600 text-center border-t">
+                                🏟️ {match.venue}
+                            </div>
+                        )}
                     </div>
                 );
             };
@@ -331,32 +263,27 @@
                             <div className="text-center mb-6">
                                 <div className="text-4xl mb-3">⚽</div>
                                 <h1 className="text-2xl font-bold text-gray-800 mb-2">Live Football Stats</h1>
-                                <p className="text-sm text-gray-600">Enter your LiveScore6 API key</p>
+                                <p className="text-sm text-gray-600">Enter your Football-Data.org API key</p>
                             </div>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">RapidAPI Key</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
                                     <input
                                         type="text"
                                         value={apiKey}
                                         onChange={(e) => setApiKey(e.target.value)}
-                                        placeholder="Enter your RapidAPI key"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        placeholder="Enter your API key"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
 
                                 <button
-                                    onClick={() => {
-                                        if (apiKey) {
-                                            setShowApiInput(false);
-                                            fetchLeagues();
-                                        }
-                                    }}
-                                    disabled={!apiKey}
-                                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+                                    onClick={fetchMatches}
+                                    disabled={!apiKey || loading}
+                                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                                 >
-                                    Get Started
+                                    {loading ? 'Loading...' : 'Get Started'}
                                 </button>
 
                                 {error && (
@@ -366,13 +293,27 @@
                                 )}
 
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-                                    <p className="font-semibold text-blue-900 mb-2">📌 Get API key:</p>
+                                    <p className="font-semibold text-blue-900 mb-2">📌 Get FREE API key:</p>
                                     <ol className="list-decimal list-inside space-y-1 text-blue-800 text-xs">
-                                        <li>Go to <a href="https://rapidapi.com/tipsters/api/livescore6" target="_blank" className="underline">RapidAPI LiveScore6</a></li>
-                                        <li>Sign up/Login (free)</li>
-                                        <li>Subscribe to FREE plan</li>
-                                        <li>Copy your API key</li>
+                                        <li>Go to <a href="https://www.football-data.org/client/register" target="_blank" className="underline font-semibold">football-data.org/register</a></li>
+                                        <li>Sign up (100% FREE, no credit card)</li>
+                                        <li>Check email for API key</li>
+                                        <li>Covers 8 major leagues!</li>
                                     </ol>
+                                </div>
+
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs">
+                                    <p className="font-semibold text-green-900 mb-1">✅ Included Leagues:</p>
+                                    <div className="text-green-800 grid grid-cols-2 gap-1">
+                                        <div>🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</div>
+                                        <div>🇪🇸 La Liga</div>
+                                        <div>🇮🇹 Serie A</div>
+                                        <div>🇩🇪 Bundesliga</div>
+                                        <div>🇫🇷 Ligue 1</div>
+                                        <div>🇳🇱 Eredivisie</div>
+                                        <div>🇵🇹 Primeira Liga</div>
+                                        <div>🏴󠁧󠁢󠁥󠁮󠁧󠁿 Championship</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -389,26 +330,27 @@
                                     <div className="text-2xl">⚽</div>
                                     <h1 className="text-xl font-bold">Live Football Stats</h1>
                                 </div>
-                                <button onClick={() => setShowApiInput(true)} className="text-xs text-gray-600">⚙️</button>
+                                <button
+                                    onClick={() => setShowApiInput(true)}
+                                    className="text-xs text-gray-600 hover:text-gray-800"
+                                >
+                                    ⚙️ Settings
+                                </button>
                             </div>
                             
-                            {loadingLeagues ? (
-                                <div className="text-center py-4 text-sm text-gray-600">Loading leagues...</div>
-                            ) : (
-                                <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
-                                    {Object.entries(leagues).map(([id, league]) => (
-                                        <button
-                                            key={id}
-                                            onClick={() => setSelectedLeague(id)}
-                                            className={`px-3 py-2 rounded-xl font-semibold text-xs whitespace-nowrap ${
-                                                selectedLeague === id ? 'bg-blue-600 text-white' : 'bg-gray-100'
-                                            }`}
-                                        >
-                                            {league.flag} {league.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                            <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
+                                {Object.entries(leagues).map(([id, league]) => (
+                                    <button
+                                        key={id}
+                                        onClick={() => setSelectedLeague(id)}
+                                        className={`px-3 py-2 rounded-xl font-semibold text-xs whitespace-nowrap transition-all active:scale-95 ${
+                                            selectedLeague === id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700'
+                                        }`}
+                                    >
+                                        {league.flag} {league.name}
+                                    </button>
+                                ))}
+                            </div>
 
                             <div className="overflow-x-auto">
                                 <div className="flex gap-2 pb-2">
@@ -416,8 +358,8 @@
                                         <button
                                             key={date}
                                             onClick={() => setSelectedDate(date)}
-                                            className={`px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                                                selectedDate === date ? 'active-date' : 'bg-gray-100'
+                                            className={`date-btn px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                                                selectedDate === date ? 'active-date shadow-lg' : 'bg-gray-100 text-gray-700'
                                             }`}
                                         >
                                             {label}
@@ -430,21 +372,39 @@
                         {loading && (
                             <div className="text-center py-12">
                                 <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                <p className="mt-4 text-gray-600">Loading matches...</p>
                             </div>
                         )}
 
-                        {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-4">{error}</div>}
-                        {debugInfo && <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800 mb-4 text-xs">{debugInfo}</div>}
+                        {error && (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-4">
+                                <div className="font-bold mb-2">⚠️ Error</div>
+                                <div>{error}</div>
+                            </div>
+                        )}
 
-                        {!loading && matches.length === 0 && (
+                        {debugInfo && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
+                                ✅ {debugInfo}
+                            </div>
+                        )}
+
+                        {!loading && !error && matches.length === 0 && (
                             <div className="bg-white rounded-xl shadow-lg p-8 text-center">
                                 <div className="text-4xl mb-3">📅</div>
-                                <h3 className="text-lg font-semibold mb-2">No matches found</h3>
-                                <p className="text-sm text-gray-600">Try a different date or league</p>
+                                <h3 className="text-lg font-semibold text-gray-800 mb-2">No matches scheduled</h3>
+                                <p className="text-gray-600 mb-2">No {leagues[selectedLeague].name} fixtures on this date</p>
+                                <p className="text-sm text-gray-500">Try selecting a different date or league</p>
                             </div>
                         )}
 
-                        {!loading && matches.length > 0 && matches.map((match, i) => <MatchCard key={i} match={match} />)}
+                        {!loading && matches.length > 0 && (
+                            <div>
+                                {matches.map(match => (
+                                    <MatchCard key={match.id} match={match} />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             );
