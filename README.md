@@ -1,2 +1,2 @@
-# FoootballStatsApp.github.io
+# FootballStatsApp.github.io
 Football Stats App
