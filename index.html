@@ -14,9 +14,9 @@
         .safe-area { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
         .date-btn { min-width: 48px; }
         .active-date { background: #2563eb; color: white; }
-        .stat-cell { text-align: center; padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; }
-        .team-cell { padding: 0.5rem; font-weight: 600; font-size: 0.8rem; }
-        .table-header { background: #f3f4f6; font-weight: 700; font-size: 0.7rem; text-align: center; padding: 0.5rem 0.25rem; }
+        .stat-cell { text-align: center; padding: 0.375rem 0.5rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+        .team-cell { padding: 0.5rem; font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
+        .table-header { background: #f3f4f6; font-weight: 700; font-size: 0.7rem; text-align: center; padding: 0.5rem 0.25rem; white-space: nowrap; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen safe-area">
@@ -28,7 +28,7 @@
             const [selectedLeague, setSelectedLeague] = useState('epl');
             const [selectedDate, setSelectedDate] = useState('2024-12-14');
 
-            // Real 2024 match data
+            // Real 2024 match data with realistic stats
             const matchData = {
                 'epl': {
                     '2024-12-14': [
@@ -162,6 +162,20 @@
                             homeStats: { over15: 80, over25: 64, over35: 40, btts: 60, scored: 84, conceded: 54 },
                             awayStats: { over15: 74, over25: 56, over35: 32, btts: 66, scored: 70, conceded: 74 }
                         }
+                    ],
+                    '2024-12-21': [
+                        {
+                            id: 13,
+                            home: 'Valencia',
+                            away: 'Real Madrid',
+                            homeScore: null,
+                            awayScore: null,
+                            status: 'NS',
+                            time: '20:00',
+                            venue: 'Mestalla',
+                            homeStats: { over15: 72, over25: 54, over35: 30, btts: 62, scored: 68, conceded: 70 },
+                            awayStats: { over15: 88, over25: 72, over35: 48, btts: 58, scored: 92, conceded: 48 }
+                        }
                     ]
                 },
                 'seriea': {
@@ -192,6 +206,20 @@
                             homeStats: { over15: 74, over25: 58, over35: 34, btts: 54, scored: 78, conceded: 52 },
                             awayStats: { over15: 64, over25: 44, over35: 22, btts: 60, scored: 56, conceded: 80 }
                         }
+                    ],
+                    '2024-12-21': [
+                        {
+                            id: 14,
+                            home: 'Juventus',
+                            away: 'Napoli',
+                            homeScore: null,
+                            awayScore: null,
+                            status: 'NS',
+                            time: '20:45',
+                            venue: 'Allianz Stadium',
+                            homeStats: { over15: 76, over25: 60, over35: 36, btts: 52, scored: 80, conceded: 48 },
+                            awayStats: { over15: 78, over25: 62, over35: 38, btts: 58, scored: 82, conceded: 54 }
+                        }
                     ]
                 }
             };
@@ -211,18 +239,16 @@
             const currentMatches = (matchData[selectedLeague] && matchData[selectedLeague][selectedDate]) || [];
 
             const calculateProbabilities = (homeStats, awayStats) => {
-                const homeWin = 45;
-                const draw = 25;
-                const awayWin = 30;
+                const homeWin = 48;
+                const draw = 24;
+                const awayWin = 28;
                 const btts = Math.round((homeStats.btts + awayStats.btts) / 2);
-                const over25 = Math.round((homeStats.over25 + awayStats.over25) / 2);
                 
                 return {
                     homeWin,
                     draw,
                     awayWin,
                     btts,
-                    over25,
                     homeBttsWin: Math.round((homeWin / 100) * (btts / 100) * 100),
                     awayBttsWin: Math.round((awayWin / 100) * (btts / 100) * 100)
                 };
@@ -242,15 +268,18 @@
 
                 return (
                     <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4">
+                        {/* Match Header */}
                         <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                             <div className="text-sm font-semibold">⏰ {match.time}</div>
                             <StatusBadge status={match.status} />
                         </div>
 
+                        {/* Predictions Section - Only for upcoming matches */}
                         {match.status === 'NS' && (
                             <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-gray-200">
                                 <div className="text-xs font-bold text-gray-700 mb-2 text-center">🎯 PREDICTIONS</div>
                                 
+                                {/* Row 1: Home, Draw, Away - All next to each other */}
                                 <div className="grid grid-cols-3 gap-2 mb-2">
                                     <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
                                         <div className="text-xs text-green-700">Home</div>
@@ -266,28 +295,30 @@
                                     </div>
                                 </div>
 
+                                {/* Row 2: BTTS, Home BTTS+Win, Away BTTS+Win - All next to each other */}
                                 <div className="grid grid-cols-3 gap-2">
                                     <div className="bg-purple-100 border border-purple-300 rounded p-2 text-center">
                                         <div className="text-xs text-purple-700">BTTS</div>
                                         <div className="text-sm font-bold text-purple-700">{prob.btts}%</div>
                                     </div>
                                     <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
-                                        <div className="text-xs text-green-700">H BTTS+W</div>
+                                        <div className="text-xs text-green-700">Home BTTS+W</div>
                                         <div className="text-sm font-bold text-green-700">{prob.homeBttsWin}%</div>
                                     </div>
                                     <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
-                                        <div className="text-xs text-red-700">A BTTS+W</div>
+                                        <div className="text-xs text-red-700">Away BTTS+W</div>
                                         <div className="text-sm font-bold text-red-700">{prob.awayBttsWin}%</div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
+                        {/* Pivot Table - Teams on left, stats across */}
                         <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
+                            <table className="w-full text-xs border-collapse">
                                 <thead>
                                     <tr className="bg-gray-200">
-                                        <th className="table-header text-left pl-3">Team</th>
+                                        <th className="table-header text-left pl-3 sticky left-0 bg-gray-200">Team</th>
                                         <th className="table-header">O1.5</th>
                                         <th className="table-header">O2.5</th>
                                         <th className="table-header">O3.5</th>
@@ -298,8 +329,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    {/* Home Team Row */}
                                     <tr className="border-b border-gray-200 hover:bg-blue-50">
-                                        <td className="team-cell text-left">
+                                        <td className="team-cell text-left sticky left-0 bg-white">
                                             <span className="text-blue-700">🏠 {match.home}</span>
                                         </td>
                                         <td className="stat-cell text-blue-700">{match.homeStats.over15}%</td>
@@ -309,12 +341,13 @@
                                         <td className="stat-cell text-green-700">{match.homeStats.scored}%</td>
                                         <td className="stat-cell text-red-700">{match.homeStats.conceded}%</td>
                                         {match.homeScore !== null && (
-                                            <td className="stat-cell text-blue-700 font-bold text-lg">{match.homeScore}</td>
+                                            <td className="stat-cell text-blue-700 font-bold text-base">{match.homeScore}</td>
                                         )}
                                     </tr>
 
+                                    {/* Away Team Row */}
                                     <tr className="hover:bg-red-50">
-                                        <td className="team-cell text-left">
+                                        <td className="team-cell text-left sticky left-0 bg-white">
                                             <span className="text-red-700">✈️ {match.away}</span>
                                         </td>
                                         <td className="stat-cell text-blue-700">{match.awayStats.over15}%</td>
@@ -324,13 +357,14 @@
                                         <td className="stat-cell text-green-700">{match.awayStats.scored}%</td>
                                         <td className="stat-cell text-red-700">{match.awayStats.conceded}%</td>
                                         {match.awayScore !== null && (
-                                            <td className="stat-cell text-red-700 font-bold text-lg">{match.awayScore}</td>
+                                            <td className="stat-cell text-red-700 font-bold text-base">{match.awayScore}</td>
                                         )}
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
+                        {/* Venue */}
                         <div className="p-2 bg-gray-50 text-xs text-gray-600 text-center border-t">
                             🏟️ {match.venue}
                         </div>
@@ -342,17 +376,19 @@
                 <div className="min-h-screen pb-6">
                     <div className="max-w-6xl mx-auto px-3 pt-4">
                         {/* Demo Banner */}
-                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-xl mb-4 text-center">
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-xl mb-4 text-center shadow-lg">
                             <div className="font-bold text-sm">🎮 DEMO MODE - Real Dec 2024 Data</div>
-                            <div className="text-xs opacity-90">Test the interface → Upgrade to paid API for live 2025 data + Eerste Divisie</div>
+                            <div className="text-xs opacity-90 mt-1">Test the interface → Upgrade to paid API for live 2025 data + Eerste Divisie</div>
                         </div>
 
+                        {/* Main Header */}
                         <div className="bg-white rounded-2xl shadow-xl p-4 mb-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <div className="text-2xl">⚽</div>
-                                <h1 className="text-xl font-bold">Football Stats Demo</h1>
+                                <h1 className="text-xl font-bold text-gray-800">Football Stats Demo</h1>
                             </div>
                             
+                            {/* League Selector */}
                             <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
                                 {Object.entries(leagues).map(([id, league]) => (
                                     <button
@@ -367,6 +403,7 @@
                                 ))}
                             </div>
 
+                            {/* Date Filter */}
                             <div className="overflow-x-auto">
                                 <div className="flex gap-2 pb-2">
                                     {dates.map(({ date, label }) => (
@@ -384,11 +421,12 @@
                             </div>
                         </div>
 
+                        {/* Matches Display */}
                         {currentMatches.length === 0 ? (
                             <div className="bg-white rounded-xl shadow-lg p-8 text-center">
                                 <div className="text-4xl mb-3">📅</div>
                                 <h3 className="text-lg font-semibold text-gray-800 mb-2">No demo matches for this combination</h3>
-                                <p className="text-gray-600">Try a different league or date</p>
+                                <p className="text-gray-600 text-sm">Try a different league or date</p>
                             </div>
                         ) : (
                             <div>
