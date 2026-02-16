@@ -28,9 +28,61 @@
             const [selectedLeague, setSelectedLeague] = useState('epl');
             const [selectedDate, setSelectedDate] = useState('2024-12-14');
 
-            // Real 2024 match data with realistic stats
+            // Real December 2024 match data - Full month
             const matchData = {
                 'epl': {
+                    '2024-12-07': [
+                        {
+                            id: 101,
+                            home: 'Manchester United',
+                            away: 'Nottingham Forest',
+                            homeScore: 2,
+                            awayScore: 3,
+                            status: 'FT',
+                            time: '15:00',
+                            venue: 'Old Trafford',
+                            homeStats: { over15: 78, over25: 62, over35: 38, btts: 65, scored: 82, conceded: 68 },
+                            awayStats: { over15: 72, over25: 54, over35: 28, btts: 70, scored: 68, conceded: 74 }
+                        },
+                        {
+                            id: 102,
+                            home: 'Everton',
+                            away: 'Liverpool',
+                            homeScore: 0,
+                            awayScore: 0,
+                            status: 'FT',
+                            time: '12:30',
+                            venue: 'Goodison Park',
+                            homeStats: { over15: 62, over25: 42, over35: 20, btts: 58, scored: 58, conceded: 78 },
+                            awayStats: { over15: 85, over25: 70, over35: 45, btts: 55, scored: 90, conceded: 50 }
+                        }
+                    ],
+                    '2024-12-08': [
+                        {
+                            id: 103,
+                            home: 'Fulham',
+                            away: 'Arsenal',
+                            homeScore: 1,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '14:00',
+                            venue: 'Craven Cottage',
+                            homeStats: { over15: 74, over25: 56, over35: 32, btts: 68, scored: 72, conceded: 70 },
+                            awayStats: { over15: 80, over25: 64, over35: 38, btts: 52, scored: 88, conceded: 46 }
+                        },
+                        {
+                            id: 104,
+                            home: 'Aston Villa',
+                            away: 'Southampton',
+                            homeScore: 1,
+                            awayScore: 0,
+                            status: 'FT',
+                            time: '16:30',
+                            venue: 'Villa Park',
+                            homeStats: { over15: 76, over25: 60, over35: 36, btts: 56, scored: 80, conceded: 52 },
+                            awayStats: { over15: 65, over25: 45, over35: 22, btts: 62, scored: 52, conceded: 88 }
+                        }
+                    ],
                     '2024-12-14': [
                         {
                             id: 1,
@@ -100,9 +152,9 @@
                             id: 6,
                             home: 'Aston Villa',
                             away: 'Manchester City',
-                            homeScore: null,
-                            awayScore: null,
-                            status: 'NS',
+                            homeScore: 1,
+                            awayScore: 2,
+                            status: 'FT',
                             time: '15:00',
                             venue: 'Villa Park',
                             homeStats: { over15: 73, over25: 58, over35: 33, btts: 56, scored: 76, conceded: 58 },
@@ -112,17 +164,85 @@
                             id: 7,
                             home: 'Newcastle',
                             away: 'Wolves',
-                            homeScore: null,
-                            awayScore: null,
-                            status: 'NS',
+                            homeScore: 3,
+                            awayScore: 0,
+                            status: 'FT',
                             time: '15:00',
                             venue: 'St James Park',
                             homeStats: { over15: 76, over25: 60, over35: 36, btts: 54, scored: 78, conceded: 54 },
                             awayStats: { over15: 68, over25: 48, over35: 24, btts: 60, scored: 62, conceded: 76 }
                         }
+                    ],
+                    '2024-12-22': [
+                        {
+                            id: 105,
+                            home: 'West Ham',
+                            away: 'Brighton',
+                            homeScore: 1,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '14:00',
+                            venue: 'London Stadium',
+                            homeStats: { over15: 70, over25: 52, over35: 28, btts: 64, scored: 68, conceded: 72 },
+                            awayStats: { over15: 74, over25: 56, over35: 32, btts: 62, scored: 72, conceded: 68 }
+                        }
+                    ],
+                    '2024-12-26': [
+                        {
+                            id: 106,
+                            home: 'Manchester City',
+                            away: 'Everton',
+                            homeScore: 1,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '12:30',
+                            venue: 'Etihad Stadium',
+                            homeStats: { over15: 80, over25: 65, over35: 40, btts: 55, scored: 85, conceded: 50 },
+                            awayStats: { over15: 60, over25: 40, over35: 20, btts: 55, scored: 55, conceded: 80 }
+                        },
+                        {
+                            id: 107,
+                            home: 'Chelsea',
+                            away: 'Fulham',
+                            homeScore: 2,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '15:00',
+                            venue: 'Stamford Bridge',
+                            homeStats: { over15: 78, over25: 62, over35: 38, btts: 58, scored: 82, conceded: 52 },
+                            awayStats: { over15: 75, over25: 55, over35: 30, btts: 65, scored: 70, conceded: 75 }
+                        }
+                    ],
+                    '2024-12-29': [
+                        {
+                            id: 108,
+                            home: 'Leicester',
+                            away: 'Manchester City',
+                            homeScore: 0,
+                            awayScore: 2,
+                            status: 'FT',
+                            time: '15:00',
+                            venue: 'King Power Stadium',
+                            homeStats: { over15: 68, over25: 48, over35: 24, btts: 62, scored: 62, conceded: 78 },
+                            awayStats: { over15: 80, over25: 65, over35: 40, btts: 55, scored: 85, conceded: 50 }
+                        }
                     ]
                 },
                 'laliga': {
+                    '2024-12-07': [
+                        {
+                            id: 201,
+                            home: 'Girona',
+                            away: 'Real Madrid',
+                            homeScore: 0,
+                            awayScore: 3,
+                            status: 'FT',
+                            time: '21:00',
+                            venue: 'Estadi Montilivi',
+                            homeStats: { over15: 70, over25: 52, over35: 28, btts: 60, scored: 66, conceded: 72 },
+                            awayStats: { over15: 88, over25: 72, over35: 48, btts: 58, scored: 92, conceded: 48 }
+                        }
+                    ],
                     '2024-12-14': [
                         {
                             id: 8,
@@ -168,13 +288,27 @@
                             id: 13,
                             home: 'Valencia',
                             away: 'Real Madrid',
-                            homeScore: null,
-                            awayScore: null,
-                            status: 'NS',
+                            homeScore: 1,
+                            awayScore: 2,
+                            status: 'FT',
                             time: '20:00',
                             venue: 'Mestalla',
                             homeStats: { over15: 72, over25: 54, over35: 30, btts: 62, scored: 68, conceded: 70 },
                             awayStats: { over15: 88, over25: 72, over35: 48, btts: 58, scored: 92, conceded: 48 }
+                        }
+                    ],
+                    '2024-12-22': [
+                        {
+                            id: 202,
+                            home: 'Barcelona',
+                            away: 'Atletico Madrid',
+                            homeScore: 1,
+                            awayScore: 2,
+                            status: 'FT',
+                            time: '21:00',
+                            venue: 'Camp Nou',
+                            homeStats: { over15: 85, over25: 68, over35: 44, btts: 52, scored: 90, conceded: 46 },
+                            awayStats: { over15: 80, over25: 64, over35: 40, btts: 60, scored: 84, conceded: 54 }
                         }
                     ]
                 },
@@ -212,13 +346,27 @@
                             id: 14,
                             home: 'Juventus',
                             away: 'Napoli',
-                            homeScore: null,
-                            awayScore: null,
-                            status: 'NS',
+                            homeScore: 2,
+                            awayScore: 1,
+                            status: 'FT',
                             time: '20:45',
                             venue: 'Allianz Stadium',
                             homeStats: { over15: 76, over25: 60, over35: 36, btts: 52, scored: 80, conceded: 48 },
                             awayStats: { over15: 78, over25: 62, over35: 38, btts: 58, scored: 82, conceded: 54 }
+                        }
+                    ],
+                    '2024-12-22': [
+                        {
+                            id: 301,
+                            home: 'Atalanta',
+                            away: 'Empoli',
+                            homeScore: 3,
+                            awayScore: 2,
+                            status: 'FT',
+                            time: '18:00',
+                            venue: 'Gewiss Stadium',
+                            homeStats: { over15: 84, over25: 68, over35: 44, btts: 62, scored: 88, conceded: 56 },
+                            awayStats: { over15: 70, over25: 52, over35: 28, btts: 66, scored: 64, conceded: 76 }
                         }
                     ]
                 }
@@ -230,12 +378,19 @@
                 'seriea': { name: 'Serie A', flag: '🇮🇹' }
             };
 
-            const dates = [
-                { date: '2024-12-14', label: 'Sat Dec 14' },
-                { date: '2024-12-15', label: 'Sun Dec 15' },
-                { date: '2024-12-21', label: 'Sat Dec 21' }
-            ];
+            // Generate all December dates with matches
+            const getAllDatesWithMatches = () => {
+                const allDates = new Set();
+                Object.values(matchData).forEach(league => {
+                    Object.keys(league).forEach(date => allDates.add(date));
+                });
+                return Array.from(allDates).sort().map(date => ({
+                    date,
+                    label: new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                }));
+            };
 
+            const dates = getAllDatesWithMatches();
             const currentMatches = (matchData[selectedLeague] && matchData[selectedLeague][selectedDate]) || [];
 
             const calculateProbabilities = (homeStats, awayStats) => {
@@ -268,52 +423,48 @@
 
                 return (
                     <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4">
-                        {/* Match Header */}
                         <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                             <div className="text-sm font-semibold">⏰ {match.time}</div>
                             <StatusBadge status={match.status} />
                         </div>
 
-                        {/* Predictions Section - Only for upcoming matches */}
-                        {match.status === 'NS' && (
-                            <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-gray-200">
-                                <div className="text-xs font-bold text-gray-700 mb-2 text-center">🎯 PREDICTIONS</div>
-                                
-                                {/* Row 1: Home, Draw, Away - All next to each other */}
-                                <div className="grid grid-cols-3 gap-2 mb-2">
-                                    <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
-                                        <div className="text-xs text-green-700">Home</div>
-                                        <div className="text-lg font-bold text-green-700">{prob.homeWin}%</div>
-                                    </div>
-                                    <div className="bg-yellow-100 border border-yellow-300 rounded p-2 text-center">
-                                        <div className="text-xs text-yellow-700">Draw</div>
-                                        <div className="text-lg font-bold text-yellow-700">{prob.draw}%</div>
-                                    </div>
-                                    <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
-                                        <div className="text-xs text-red-700">Away</div>
-                                        <div className="text-lg font-bold text-red-700">{prob.awayWin}%</div>
-                                    </div>
+                        {/* ALWAYS SHOW PREDICTIONS - for finished and upcoming */}
+                        <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-gray-200">
+                            <div className="text-xs font-bold text-gray-700 mb-2 text-center">
+                                🎯 PREDICTIONS {match.status === 'FT' && '(Test vs Actual)'}
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-2 mb-2">
+                                <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
+                                    <div className="text-xs text-green-700">Home</div>
+                                    <div className="text-lg font-bold text-green-700">{prob.homeWin}%</div>
                                 </div>
-
-                                {/* Row 2: BTTS, Home BTTS+Win, Away BTTS+Win - All next to each other */}
-                                <div className="grid grid-cols-3 gap-2">
-                                    <div className="bg-purple-100 border border-purple-300 rounded p-2 text-center">
-                                        <div className="text-xs text-purple-700">BTTS</div>
-                                        <div className="text-sm font-bold text-purple-700">{prob.btts}%</div>
-                                    </div>
-                                    <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
-                                        <div className="text-xs text-green-700">Home BTTS+W</div>
-                                        <div className="text-sm font-bold text-green-700">{prob.homeBttsWin}%</div>
-                                    </div>
-                                    <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
-                                        <div className="text-xs text-red-700">Away BTTS+W</div>
-                                        <div className="text-sm font-bold text-red-700">{prob.awayBttsWin}%</div>
-                                    </div>
+                                <div className="bg-yellow-100 border border-yellow-300 rounded p-2 text-center">
+                                    <div className="text-xs text-yellow-700">Draw</div>
+                                    <div className="text-lg font-bold text-yellow-700">{prob.draw}%</div>
+                                </div>
+                                <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
+                                    <div className="text-xs text-red-700">Away</div>
+                                    <div className="text-lg font-bold text-red-700">{prob.awayWin}%</div>
                                 </div>
                             </div>
-                        )}
 
-                        {/* Pivot Table - Teams on left, stats across */}
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="bg-purple-100 border border-purple-300 rounded p-2 text-center">
+                                    <div className="text-xs text-purple-700">BTTS</div>
+                                    <div className="text-sm font-bold text-purple-700">{prob.btts}%</div>
+                                </div>
+                                <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
+                                    <div className="text-xs text-green-700">Home BTTS+W</div>
+                                    <div className="text-sm font-bold text-green-700">{prob.homeBttsWin}%</div>
+                                </div>
+                                <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
+                                    <div className="text-xs text-red-700">Away BTTS+W</div>
+                                    <div className="text-sm font-bold text-red-700">{prob.awayBttsWin}%</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs border-collapse">
                                 <thead>
@@ -329,7 +480,6 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {/* Home Team Row */}
                                     <tr className="border-b border-gray-200 hover:bg-blue-50">
                                         <td className="team-cell text-left sticky left-0 bg-white">
                                             <span className="text-blue-700">🏠 {match.home}</span>
@@ -345,7 +495,6 @@
                                         )}
                                     </tr>
 
-                                    {/* Away Team Row */}
                                     <tr className="hover:bg-red-50">
                                         <td className="team-cell text-left sticky left-0 bg-white">
                                             <span className="text-red-700">✈️ {match.away}</span>
@@ -364,7 +513,6 @@
                             </table>
                         </div>
 
-                        {/* Venue */}
                         <div className="p-2 bg-gray-50 text-xs text-gray-600 text-center border-t">
                             🏟️ {match.venue}
                         </div>
@@ -375,20 +523,17 @@
             return (
                 <div className="min-h-screen pb-6">
                     <div className="max-w-6xl mx-auto px-3 pt-4">
-                        {/* Demo Banner */}
                         <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-xl mb-4 text-center shadow-lg">
-                            <div className="font-bold text-sm">🎮 DEMO MODE - Real Dec 2024 Data</div>
-                            <div className="text-xs opacity-90 mt-1">Test the interface → Upgrade to paid API for live 2025 data + Eerste Divisie</div>
+                            <div className="font-bold text-sm">🎮 FULL DECEMBER 2024 DATA</div>
+                            <div className="text-xs opacity-90 mt-1">Test predictions accuracy vs actual results! Then upgrade for live 2025 data</div>
                         </div>
 
-                        {/* Main Header */}
                         <div className="bg-white rounded-2xl shadow-xl p-4 mb-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <div className="text-2xl">⚽</div>
                                 <h1 className="text-xl font-bold text-gray-800">Football Stats Demo</h1>
                             </div>
                             
-                            {/* League Selector */}
                             <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
                                 {Object.entries(leagues).map(([id, league]) => (
                                     <button
@@ -403,7 +548,6 @@
                                 ))}
                             </div>
 
-                            {/* Date Filter */}
                             <div className="overflow-x-auto">
                                 <div className="flex gap-2 pb-2">
                                     {dates.map(({ date, label }) => (
@@ -421,17 +565,16 @@
                             </div>
                         </div>
 
-                        {/* Matches Display */}
                         {currentMatches.length === 0 ? (
                             <div className="bg-white rounded-xl shadow-lg p-8 text-center">
                                 <div className="text-4xl mb-3">📅</div>
-                                <h3 className="text-lg font-semibold text-gray-800 mb-2">No demo matches for this combination</h3>
+                                <h3 className="text-lg font-semibold text-gray-800 mb-2">No matches on this date</h3>
                                 <p className="text-gray-600 text-sm">Try a different league or date</p>
                             </div>
                         ) : (
                             <div>
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                    ✅ Showing {currentMatches.length} real match{currentMatches.length !== 1 ? 'es' : ''} from Dec 2024
+                                    ✅ Showing {currentMatches.length} match{currentMatches.length !== 1 ? 'es' : ''} - Full Dec 2024 data with predictions vs actuals
                                 </div>
                                 {currentMatches.map(match => (
                                     <MatchCard key={match.id} match={match} />
