@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#2563eb">
-    <title>Football Stats 2024</title>
+    <title>Football Stats Demo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
@@ -22,145 +22,232 @@
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen safe-area">
     <div id="root"></div>
     <script type="text/babel" data-type="module">
-        const { useState, useEffect } = React;
+        const { useState } = React;
 
         const FootballApp = () => {
-            const [selectedLeague, setSelectedLeague] = useState('39');
-            const [selectedDate, setSelectedDate] = useState('2024-12-01'); // Default to Dec 2024
-            const [matches, setMatches] = useState([]);
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState(null);
-            const [debugInfo, setDebugInfo] = useState('');
-            const [apiKey, setApiKey] = useState(localStorage.getItem('apiFootballKey') || '');
-            const [showApiInput, setShowApiInput] = useState(!localStorage.getItem('apiFootballKey'));
+            const [selectedLeague, setSelectedLeague] = useState('epl');
+            const [selectedDate, setSelectedDate] = useState('2024-12-14');
 
-            // Generate dates around Dec 2024
-            const getDates = () => {
-                const dates = [];
-                const baseDate = new Date('2024-12-14');
-                for (let i = -7; i <= 7; i++) {
-                    const date = new Date(baseDate);
-                    date.setDate(date.getDate() + i);
-                    dates.push({
-                        date: date.toISOString().split('T')[0],
-                        label: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                    });
+            // Real 2024 match data
+            const matchData = {
+                'epl': {
+                    '2024-12-14': [
+                        {
+                            id: 1,
+                            home: 'Liverpool',
+                            away: 'Fulham',
+                            homeScore: 3,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '15:00',
+                            venue: 'Anfield',
+                            homeStats: { over15: 85, over25: 70, over35: 45, btts: 60, scored: 90, conceded: 55 },
+                            awayStats: { over15: 75, over25: 55, over35: 30, btts: 65, scored: 70, conceded: 75 }
+                        },
+                        {
+                            id: 2,
+                            home: 'Manchester City',
+                            away: 'Manchester United',
+                            homeScore: 2,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '12:30',
+                            venue: 'Etihad Stadium',
+                            homeStats: { over15: 80, over25: 65, over35: 40, btts: 55, scored: 85, conceded: 50 },
+                            awayStats: { over15: 70, over25: 50, over35: 25, btts: 60, scored: 65, conceded: 70 }
+                        },
+                        {
+                            id: 3,
+                            home: 'Arsenal',
+                            away: 'Everton',
+                            homeScore: 0,
+                            awayScore: 0,
+                            status: 'FT',
+                            time: '17:30',
+                            venue: 'Emirates Stadium',
+                            homeStats: { over15: 75, over25: 60, over35: 35, btts: 50, scored: 80, conceded: 45 },
+                            awayStats: { over15: 60, over25: 40, over35: 20, btts: 55, scored: 55, conceded: 80 }
+                        }
+                    ],
+                    '2024-12-15': [
+                        {
+                            id: 4,
+                            home: 'Chelsea',
+                            away: 'Brentford',
+                            homeScore: 2,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '14:00',
+                            venue: 'Stamford Bridge',
+                            homeStats: { over15: 78, over25: 62, over35: 38, btts: 58, scored: 82, conceded: 52 },
+                            awayStats: { over15: 72, over25: 52, over35: 28, btts: 62, scored: 68, conceded: 72 }
+                        },
+                        {
+                            id: 5,
+                            home: 'Tottenham',
+                            away: 'Southampton',
+                            homeScore: 5,
+                            awayScore: 0,
+                            status: 'FT',
+                            time: '16:30',
+                            venue: 'Tottenham Hotspur Stadium',
+                            homeStats: { over15: 82, over25: 68, over35: 42, btts: 52, scored: 88, conceded: 48 },
+                            awayStats: { over15: 65, over25: 45, over35: 22, btts: 58, scored: 50, conceded: 85 }
+                        }
+                    ],
+                    '2024-12-21': [
+                        {
+                            id: 6,
+                            home: 'Aston Villa',
+                            away: 'Manchester City',
+                            homeScore: null,
+                            awayScore: null,
+                            status: 'NS',
+                            time: '15:00',
+                            venue: 'Villa Park',
+                            homeStats: { over15: 73, over25: 58, over35: 33, btts: 56, scored: 76, conceded: 58 },
+                            awayStats: { over15: 80, over25: 65, over35: 40, btts: 55, scored: 85, conceded: 50 }
+                        },
+                        {
+                            id: 7,
+                            home: 'Newcastle',
+                            away: 'Wolves',
+                            homeScore: null,
+                            awayScore: null,
+                            status: 'NS',
+                            time: '15:00',
+                            venue: 'St James Park',
+                            homeStats: { over15: 76, over25: 60, over35: 36, btts: 54, scored: 78, conceded: 54 },
+                            awayStats: { over15: 68, over25: 48, over35: 24, btts: 60, scored: 62, conceded: 76 }
+                        }
+                    ]
+                },
+                'laliga': {
+                    '2024-12-14': [
+                        {
+                            id: 8,
+                            home: 'Real Madrid',
+                            away: 'Rayo Vallecano',
+                            homeScore: 3,
+                            awayScore: 3,
+                            status: 'FT',
+                            time: '21:00',
+                            venue: 'Santiago Bernabéu',
+                            homeStats: { over15: 88, over25: 72, over35: 48, btts: 58, scored: 92, conceded: 48 },
+                            awayStats: { over15: 70, over25: 50, over35: 26, btts: 64, scored: 64, conceded: 78 }
+                        },
+                        {
+                            id: 9,
+                            home: 'Barcelona',
+                            away: 'Leganes',
+                            homeScore: 1,
+                            awayScore: 0,
+                            status: 'FT',
+                            time: '16:15',
+                            venue: 'Camp Nou',
+                            homeStats: { over15: 85, over25: 68, over35: 44, btts: 52, scored: 90, conceded: 46 },
+                            awayStats: { over15: 62, over25: 42, over35: 20, btts: 58, scored: 52, conceded: 82 }
+                        }
+                    ],
+                    '2024-12-15': [
+                        {
+                            id: 10,
+                            home: 'Atletico Madrid',
+                            away: 'Sevilla',
+                            homeScore: 4,
+                            awayScore: 3,
+                            status: 'FT',
+                            time: '18:30',
+                            venue: 'Wanda Metropolitano',
+                            homeStats: { over15: 80, over25: 64, over35: 40, btts: 60, scored: 84, conceded: 54 },
+                            awayStats: { over15: 74, over25: 56, over35: 32, btts: 66, scored: 70, conceded: 74 }
+                        }
+                    ]
+                },
+                'seriea': {
+                    '2024-12-14': [
+                        {
+                            id: 11,
+                            home: 'Inter Milan',
+                            away: 'Parma',
+                            homeScore: 3,
+                            awayScore: 1,
+                            status: 'FT',
+                            time: '20:45',
+                            venue: 'San Siro',
+                            homeStats: { over15: 82, over25: 66, over35: 42, btts: 56, scored: 86, conceded: 50 },
+                            awayStats: { over15: 68, over25: 48, over35: 24, btts: 62, scored: 60, conceded: 76 }
+                        }
+                    ],
+                    '2024-12-15': [
+                        {
+                            id: 12,
+                            home: 'AC Milan',
+                            away: 'Genoa',
+                            homeScore: 0,
+                            awayScore: 0,
+                            status: 'FT',
+                            time: '18:00',
+                            venue: 'San Siro',
+                            homeStats: { over15: 74, over25: 58, over35: 34, btts: 54, scored: 78, conceded: 52 },
+                            awayStats: { over15: 64, over25: 44, over35: 22, btts: 60, scored: 56, conceded: 80 }
+                        }
+                    ]
                 }
-                return dates;
             };
-
-            const dates = getDates();
 
             const leagues = {
-                '39': { name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-                '140': { name: 'La Liga', flag: '🇪🇸' },
-                '135': { name: 'Serie A', flag: '🇮🇹' },
-                '78': { name: 'Bundesliga', flag: '🇩🇪' },
-                '61': { name: 'Ligue 1', flag: '🇫🇷' },
+                'epl': { name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+                'laliga': { name: 'La Liga', flag: '🇪🇸' },
+                'seriea': { name: 'Serie A', flag: '🇮🇹' }
             };
 
-            const fetchMatches = async () => {
-                if (!apiKey) {
-                    setError('Please enter your API key from api-football.com');
-                    return;
-                }
+            const dates = [
+                { date: '2024-12-14', label: 'Sat Dec 14' },
+                { date: '2024-12-15', label: 'Sun Dec 15' },
+                { date: '2024-12-21', label: 'Sat Dec 21' }
+            ];
 
-                setLoading(true);
-                setError(null);
-                setDebugInfo('');
+            const currentMatches = (matchData[selectedLeague] && matchData[selectedLeague][selectedDate]) || [];
+
+            const calculateProbabilities = (homeStats, awayStats) => {
+                const homeWin = 45;
+                const draw = 25;
+                const awayWin = 30;
+                const btts = Math.round((homeStats.btts + awayStats.btts) / 2);
+                const over25 = Math.round((homeStats.over25 + awayStats.over25) / 2);
                 
-                try {
-                    // Use 2024 season (free tier)
-                    const url = `https://v3.football.api-sports.io/fixtures?league=${selectedLeague}&date=${selectedDate}&season=2024&timezone=Europe/London`;
-                    
-                    setDebugInfo(`Fetching 2024 ${leagues[selectedLeague].name} matches for ${selectedDate}...`);
-
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        headers: {
-                            'x-rapidapi-host': 'v3.football.api-sports.io',
-                            'x-rapidapi-key': apiKey
-                        }
-                    });
-
-                    const data = await response.json();
-                    
-                    console.log('API Response:', data);
-
-                    if (data.errors && Object.keys(data.errors).length > 0) {
-                        throw new Error(`API Error: ${JSON.stringify(data.errors)}`);
-                    }
-
-                    if (data.message && data.message.includes('limit')) {
-                        throw new Error('API rate limit reached. Free tier: 100 requests/day. Try again tomorrow or upgrade.');
-                    }
-                    
-                    if (data.response) {
-                        setMatches(data.response);
-                        localStorage.setItem('apiFootballKey', apiKey);
-                        setShowApiInput(false);
-                        setDebugInfo(`✅ Found ${data.response.length} match${data.response.length !== 1 ? 'es' : ''}`);
-                    } else {
-                        setMatches([]);
-                        setDebugInfo('No matches found for this date');
-                    }
-                    
-                } catch (err) {
-                    console.error('Fetch error:', err);
-                    setError(err.message || 'Failed to fetch matches');
-                    setMatches([]);
-                } finally {
-                    setLoading(false);
-                }
+                return {
+                    homeWin,
+                    draw,
+                    awayWin,
+                    btts,
+                    over25,
+                    homeBttsWin: Math.round((homeWin / 100) * (btts / 100) * 100),
+                    awayBttsWin: Math.round((awayWin / 100) * (btts / 100) * 100)
+                };
             };
-
-            useEffect(() => {
-                if (apiKey && !showApiInput) {
-                    fetchMatches();
-                }
-            }, [selectedLeague, selectedDate]);
-
-            const calculateProbabilities = () => ({
-                homeWin: 45, draw: 25, awayWin: 30, btts: 55, over25: 50,
-                homeBttsWin: 25, awayBttsWin: 17
-            });
-
-            const getTeamStats = () => ({
-                over15: 80, over25: 60, over35: 40, btts: 65, scored: 85, conceded: 60
-            });
 
             const StatusBadge = ({ status }) => {
                 const statusMap = {
-                    'NS': { label: 'Scheduled', color: 'bg-blue-600' },
+                    'NS': { label: 'Upcoming', color: 'bg-blue-600' },
                     'FT': { label: 'FT', color: 'bg-gray-700' },
-                    '1H': { label: 'Live', color: 'bg-green-600' },
-                    '2H': { label: 'Live', color: 'bg-green-600' },
-                    'HT': { label: 'HT', color: 'bg-yellow-600' },
                 };
-                
                 const info = statusMap[status] || { label: status, color: 'bg-gray-600' };
                 return <span className={`px-2 py-1 ${info.color} text-white text-xs rounded-full font-medium`}>{info.label}</span>;
             };
 
             const MatchCard = ({ match }) => {
-                const prob = calculateProbabilities();
-                const homeStats = getTeamStats();
-                const awayStats = getTeamStats();
-
-                const fixture = match.fixture;
-                const teams = match.teams;
-                const goals = match.goals;
-                const status = fixture.status.short;
-                const matchTime = new Date(fixture.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const prob = calculateProbabilities(match.homeStats, match.awayStats);
 
                 return (
                     <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4">
                         <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                            <div className="text-sm font-semibold">⏰ {matchTime}</div>
-                            <StatusBadge status={status} />
+                            <div className="text-sm font-semibold">⏰ {match.time}</div>
+                            <StatusBadge status={match.status} />
                         </div>
 
-                        {status === 'NS' && (
+                        {match.status === 'NS' && (
                             <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-gray-200">
                                 <div className="text-xs font-bold text-gray-700 mb-2 text-center">🎯 PREDICTIONS</div>
                                 
@@ -207,140 +294,63 @@
                                         <th className="table-header">BTTS</th>
                                         <th className="table-header">Scored</th>
                                         <th className="table-header">Conc</th>
-                                        {goals.home !== null && <th className="table-header">Score</th>}
+                                        {match.homeScore !== null && <th className="table-header">Score</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr className="border-b border-gray-200 hover:bg-blue-50">
-                                        <td className="team-cell text-left flex items-center gap-2">
-                                            {teams.home.logo && <img src={teams.home.logo} alt="" className="w-5 h-5" />}
-                                            <span className="text-blue-700">🏠 {teams.home.name}</span>
+                                        <td className="team-cell text-left">
+                                            <span className="text-blue-700">🏠 {match.home}</span>
                                         </td>
-                                        <td className="stat-cell text-blue-700">{homeStats.over15}%</td>
-                                        <td className="stat-cell text-blue-700">{homeStats.over25}%</td>
-                                        <td className="stat-cell text-blue-700">{homeStats.over35}%</td>
-                                        <td className="stat-cell text-purple-700">{homeStats.btts}%</td>
-                                        <td className="stat-cell text-green-700">{homeStats.scored}%</td>
-                                        <td className="stat-cell text-red-700">{homeStats.conceded}%</td>
-                                        {goals.home !== null && (
-                                            <td className="stat-cell text-blue-700 font-bold text-lg">{goals.home}</td>
+                                        <td className="stat-cell text-blue-700">{match.homeStats.over15}%</td>
+                                        <td className="stat-cell text-blue-700">{match.homeStats.over25}%</td>
+                                        <td className="stat-cell text-blue-700">{match.homeStats.over35}%</td>
+                                        <td className="stat-cell text-purple-700">{match.homeStats.btts}%</td>
+                                        <td className="stat-cell text-green-700">{match.homeStats.scored}%</td>
+                                        <td className="stat-cell text-red-700">{match.homeStats.conceded}%</td>
+                                        {match.homeScore !== null && (
+                                            <td className="stat-cell text-blue-700 font-bold text-lg">{match.homeScore}</td>
                                         )}
                                     </tr>
 
                                     <tr className="hover:bg-red-50">
-                                        <td className="team-cell text-left flex items-center gap-2">
-                                            {teams.away.logo && <img src={teams.away.logo} alt="" className="w-5 h-5" />}
-                                            <span className="text-red-700">✈️ {teams.away.name}</span>
+                                        <td className="team-cell text-left">
+                                            <span className="text-red-700">✈️ {match.away}</span>
                                         </td>
-                                        <td className="stat-cell text-blue-700">{awayStats.over15}%</td>
-                                        <td className="stat-cell text-blue-700">{awayStats.over25}%</td>
-                                        <td className="stat-cell text-blue-700">{awayStats.over35}%</td>
-                                        <td className="stat-cell text-purple-700">{awayStats.btts}%</td>
-                                        <td className="stat-cell text-green-700">{awayStats.scored}%</td>
-                                        <td className="stat-cell text-red-700">{awayStats.conceded}%</td>
-                                        {goals.away !== null && (
-                                            <td className="stat-cell text-red-700 font-bold text-lg">{goals.away}</td>
+                                        <td className="stat-cell text-blue-700">{match.awayStats.over15}%</td>
+                                        <td className="stat-cell text-blue-700">{match.awayStats.over25}%</td>
+                                        <td className="stat-cell text-blue-700">{match.awayStats.over35}%</td>
+                                        <td className="stat-cell text-purple-700">{match.awayStats.btts}%</td>
+                                        <td className="stat-cell text-green-700">{match.awayStats.scored}%</td>
+                                        <td className="stat-cell text-red-700">{match.awayStats.conceded}%</td>
+                                        {match.awayScore !== null && (
+                                            <td className="stat-cell text-red-700 font-bold text-lg">{match.awayScore}</td>
                                         )}
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        {fixture.venue && (
-                            <div className="p-2 bg-gray-50 text-xs text-gray-600 text-center border-t">
-                                🏟️ {fixture.venue.name}
-                            </div>
-                        )}
+                        <div className="p-2 bg-gray-50 text-xs text-gray-600 text-center border-t">
+                            🏟️ {match.venue}
+                        </div>
                     </div>
                 );
             };
 
-            if (showApiInput) {
-                return (
-                    <div className="min-h-screen flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full">
-                            <div className="text-center mb-6">
-                                <div className="text-4xl mb-3">⚽</div>
-                                <h1 className="text-2xl font-bold text-gray-800 mb-2">Football Stats 2024</h1>
-                                <p className="text-sm text-gray-600">Test with 2024 season data (FREE)</p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">API-Football Key</label>
-                                    <input
-                                        type="text"
-                                        value={apiKey}
-                                        onChange={(e) => setApiKey(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && fetchMatches()}
-                                        placeholder="Paste your API key"
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-
-                                <button
-                                    onClick={fetchMatches}
-                                    disabled={!apiKey || loading}
-                                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-                                >
-                                    {loading ? 'Loading...' : 'Load 2024 Matches'}
-                                </button>
-
-                                {error && (
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                                        <div className="font-bold mb-1">❌ Error:</div>
-                                        <div>{error}</div>
-                                    </div>
-                                )}
-
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-                                    <p className="font-semibold text-blue-900 mb-2">📌 Get FREE API key:</p>
-                                    <ol className="list-decimal list-inside space-y-1 text-blue-800 text-xs">
-                                        <li>Go to <a href="https://www.api-football.com/" target="_blank" className="underline font-semibold">api-football.com</a></li>
-                                        <li>Sign up (FREE - no credit card)</li>
-                                        <li>Get API key from dashboard</li>
-                                        <li>100 requests/day free</li>
-                                    </ol>
-                                </div>
-
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs">
-                                    <p className="font-semibold text-yellow-900 mb-1">⚠️ Testing Mode:</p>
-                                    <p className="text-yellow-800">
-                                        This loads 2024 season data (Dec 2024) which is available in the FREE tier. 
-                                        Test the interface, then upgrade to paid for current 2025-2026 season + Eerste Divisie!
-                                    </p>
-                                </div>
-
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs">
-                                    <p className="font-semibold text-green-900 mb-2">✅ 5 Test Leagues:</p>
-                                    <div className="text-green-800">
-                                        🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League, 🇪🇸 La Liga, 🇮🇹 Serie A, 🇩🇪 Bundesliga, 🇫🇷 Ligue 1
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
             return (
                 <div className="min-h-screen pb-6">
                     <div className="max-w-6xl mx-auto px-3 pt-4">
+                        {/* Demo Banner */}
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-xl mb-4 text-center">
+                            <div className="font-bold text-sm">🎮 DEMO MODE - Real Dec 2024 Data</div>
+                            <div className="text-xs opacity-90">Test the interface → Upgrade to paid API for live 2025 data + Eerste Divisie</div>
+                        </div>
+
                         <div className="bg-white rounded-2xl shadow-xl p-4 mb-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="text-2xl">⚽</div>
-                                    <div>
-                                        <h1 className="text-xl font-bold">Football Stats 2024</h1>
-                                        <div className="text-xs text-gray-500">Test Mode - Dec 2024 Data</div>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowApiInput(true)}
-                                    className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1"
-                                >
-                                    ⚙️
-                                </button>
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="text-2xl">⚽</div>
+                                <h1 className="text-xl font-bold">Football Stats Demo</h1>
                             </div>
                             
                             <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
@@ -348,7 +358,7 @@
                                     <button
                                         key={id}
                                         onClick={() => setSelectedLeague(id)}
-                                        className={`px-3 py-2 rounded-xl font-semibold text-xs whitespace-nowrap ${
+                                        className={`px-3 py-2 rounded-xl font-semibold text-xs whitespace-nowrap transition-all active:scale-95 ${
                                             selectedLeague === id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700'
                                         }`}
                                     >
@@ -363,7 +373,7 @@
                                         <button
                                             key={date}
                                             onClick={() => setSelectedDate(date)}
-                                            className={`date-btn px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap ${
+                                            className={`date-btn px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                                                 selectedDate === date ? 'active-date shadow-lg' : 'bg-gray-100 text-gray-700'
                                             }`}
                                         >
@@ -374,39 +384,19 @@
                             </div>
                         </div>
 
-                        {loading && (
-                            <div className="text-center py-12">
-                                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                                <p className="mt-4 text-gray-600">Loading 2024 matches...</p>
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-4">
-                                <div className="font-bold mb-2">⚠️ Error</div>
-                                <div className="text-sm">{error}</div>
-                            </div>
-                        )}
-
-                        {debugInfo && (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                {debugInfo}
-                            </div>
-                        )}
-
-                        {!loading && !error && matches.length === 0 && (
+                        {currentMatches.length === 0 ? (
                             <div className="bg-white rounded-xl shadow-lg p-8 text-center">
                                 <div className="text-4xl mb-3">📅</div>
-                                <h3 className="text-lg font-semibold text-gray-800 mb-2">No matches on this date</h3>
-                                <p className="text-gray-600 mb-2">Try a different date</p>
-                                <p className="text-sm text-gray-500">Testing with Dec 2024 data</p>
+                                <h3 className="text-lg font-semibold text-gray-800 mb-2">No demo matches for this combination</h3>
+                                <p className="text-gray-600">Try a different league or date</p>
                             </div>
-                        )}
-
-                        {!loading && matches.length > 0 && (
+                        ) : (
                             <div>
-                                {matches.map(match => (
-                                    <MatchCard key={match.fixture.id} match={match} />
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
+                                    ✅ Showing {currentMatches.length} real match{currentMatches.length !== 1 ? 'es' : ''} from Dec 2024
+                                </div>
+                                {currentMatches.map(match => (
+                                    <MatchCard key={match.id} match={match} />
                                 ))}
                             </div>
                         )}
