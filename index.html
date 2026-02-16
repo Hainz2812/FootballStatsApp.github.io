@@ -28,7 +28,7 @@
             const [selectedLeague, setSelectedLeague] = useState('epl');
             const [selectedDate, setSelectedDate] = useState('2024-12-14');
 
-            // Real December 2024 match data - Full month
+            // Real December 2024 match data
             const matchData = {
                 'epl': {
                     '2024-12-07': [
@@ -378,7 +378,6 @@
                 'seriea': { name: 'Serie A', flag: '🇮🇹' }
             };
 
-            // Generate all December dates with matches
             const getAllDatesWithMatches = () => {
                 const allDates = new Set();
                 Object.values(matchData).forEach(league => {
@@ -393,19 +392,56 @@
             const dates = getAllDatesWithMatches();
             const currentMatches = (matchData[selectedLeague] && matchData[selectedLeague][selectedDate]) || [];
 
+            // DYNAMIC prediction calculator based on actual stats
             const calculateProbabilities = (homeStats, awayStats) => {
-                const homeWin = 48;
-                const draw = 24;
-                const awayWin = 28;
-                const btts = Math.round((homeStats.btts + awayStats.btts) / 2);
+                // Home advantage
+                const homeAdvantage = 10;
+                
+                // Calculate attacking/defensive strength difference
+                const homeAttack = homeStats.scored;
+                const awayDefense = awayStats.conceded;
+                const awayAttack = awayStats.scored;
+                const homeDefense = homeStats.conceded;
+                
+                // Win probability based on attack vs defense matchups
+                const homeStrength = (homeAttack + awayDefense) / 2;
+                const awayStrength = (awayAttack + homeDefense) / 2;
+                const totalStrength = homeStrength + awayStrength;
+                
+                // Calculate base probabilities
+                let homeWinBase = (homeStrength / totalStrength) * 100;
+                let awayWinBase = (awayStrength / totalStrength) * 100;
+                
+                // Apply home advantage
+                let homeWin = Math.min(85, Math.max(20, homeWinBase + homeAdvantage));
+                let awayWin = Math.min(75, Math.max(15, awayWinBase - 5));
+                
+                // Draw probability (higher when teams are evenly matched)
+                const difference = Math.abs(homeWin - awayWin);
+                let draw = Math.min(35, Math.max(15, 35 - (difference * 0.3)));
+                
+                // Normalize to 100%
+                const total = homeWin + draw + awayWin;
+                homeWin = Math.round((homeWin / total) * 100);
+                draw = Math.round((draw / total) * 100);
+                awayWin = 100 - homeWin - draw;
+                
+                // BTTS calculation
+                const homeScoringProb = homeStats.scored;
+                const awayScoringProb = awayStats.scored;
+                const btts = Math.round((homeScoringProb + awayScoringProb) / 2);
+                
+                // BTTS + Win combinations
+                const homeBttsWin = Math.round((homeWin / 100) * (btts / 100) * 100);
+                const awayBttsWin = Math.round((awayWin / 100) * (btts / 100) * 100);
                 
                 return {
                     homeWin,
                     draw,
                     awayWin,
                     btts,
-                    homeBttsWin: Math.round((homeWin / 100) * (btts / 100) * 100),
-                    awayBttsWin: Math.round((awayWin / 100) * (btts / 100) * 100)
+                    homeBttsWin,
+                    awayBttsWin
                 };
             };
 
@@ -421,6 +457,22 @@
             const MatchCard = ({ match }) => {
                 const prob = calculateProbabilities(match.homeStats, match.awayStats);
 
+                // Determine if predictions were correct
+                const getResult = () => {
+                    if (match.homeScore === null) return null;
+                    if (match.homeScore > match.awayScore) return 'home';
+                    if (match.awayScore > match.homeScore) return 'away';
+                    return 'draw';
+                };
+                
+                const actualResult = getResult();
+                const predictedResult = prob.homeWin > prob.awayWin && prob.homeWin > prob.draw ? 'home' : 
+                                       prob.awayWin > prob.homeWin && prob.awayWin > prob.draw ? 'away' : 'draw';
+                const predictionCorrect = actualResult === predictedResult;
+                
+                const actualBTTS = match.homeScore > 0 && match.awayScore > 0;
+                const bttsCorrect = match.homeScore !== null ? (actualBTTS && prob.btts >= 50) || (!actualBTTS && prob.btts < 50) : null;
+
                 return (
                     <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4">
                         <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
@@ -428,31 +480,38 @@
                             <StatusBadge status={match.status} />
                         </div>
 
-                        {/* ALWAYS SHOW PREDICTIONS - for finished and upcoming */}
                         <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-gray-200">
-                            <div className="text-xs font-bold text-gray-700 mb-2 text-center">
-                                🎯 PREDICTIONS {match.status === 'FT' && '(Test vs Actual)'}
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="text-xs font-bold text-gray-700">🎯 PREDICTIONS</div>
+                                {match.status === 'FT' && predictionCorrect !== null && (
+                                    <div className={`text-xs font-bold ${predictionCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                        {predictionCorrect ? '✅ CORRECT' : '❌ WRONG'}
+                                    </div>
+                                )}
                             </div>
                             
                             <div className="grid grid-cols-3 gap-2 mb-2">
-                                <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
+                                <div className={`border rounded p-2 text-center ${actualResult === 'home' ? 'bg-green-200 border-green-400' : 'bg-green-100 border-green-300'}`}>
                                     <div className="text-xs text-green-700">Home</div>
                                     <div className="text-lg font-bold text-green-700">{prob.homeWin}%</div>
                                 </div>
-                                <div className="bg-yellow-100 border border-yellow-300 rounded p-2 text-center">
+                                <div className={`border rounded p-2 text-center ${actualResult === 'draw' ? 'bg-yellow-200 border-yellow-400' : 'bg-yellow-100 border-yellow-300'}`}>
                                     <div className="text-xs text-yellow-700">Draw</div>
                                     <div className="text-lg font-bold text-yellow-700">{prob.draw}%</div>
                                 </div>
-                                <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
+                                <div className={`border rounded p-2 text-center ${actualResult === 'away' ? 'bg-red-200 border-red-400' : 'bg-red-100 border-red-300'}`}>
                                     <div className="text-xs text-red-700">Away</div>
                                     <div className="text-lg font-bold text-red-700">{prob.awayWin}%</div>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-3 gap-2">
-                                <div className="bg-purple-100 border border-purple-300 rounded p-2 text-center">
+                                <div className={`border rounded p-2 text-center ${bttsCorrect === true ? 'bg-purple-200 border-purple-400' : bttsCorrect === false ? 'bg-gray-200 border-gray-400' : 'bg-purple-100 border-purple-300'}`}>
                                     <div className="text-xs text-purple-700">BTTS</div>
                                     <div className="text-sm font-bold text-purple-700">{prob.btts}%</div>
+                                    {bttsCorrect !== null && (
+                                        <div className="text-xs">{bttsCorrect ? '✅' : '❌'}</div>
+                                    )}
                                 </div>
                                 <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
                                     <div className="text-xs text-green-700">Home BTTS+W</div>
@@ -524,8 +583,8 @@
                 <div className="min-h-screen pb-6">
                     <div className="max-w-6xl mx-auto px-3 pt-4">
                         <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-xl mb-4 text-center shadow-lg">
-                            <div className="font-bold text-sm">🎮 FULL DECEMBER 2024 DATA</div>
-                            <div className="text-xs opacity-90 mt-1">Test predictions accuracy vs actual results! Then upgrade for live 2025 data</div>
+                            <div className="font-bold text-sm">🎮 DYNAMIC PREDICTIONS - December 2024</div>
+                            <div className="text-xs opacity-90 mt-1">Each prediction calculated from team stats • Test accuracy vs actual results!</div>
                         </div>
 
                         <div className="bg-white rounded-2xl shadow-xl p-4 mb-4">
@@ -574,7 +633,7 @@
                         ) : (
                             <div>
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                    ✅ Showing {currentMatches.length} match{currentMatches.length !== 1 ? 'es' : ''} - Full Dec 2024 data with predictions vs actuals
+                                    ✅ {currentMatches.length} match{currentMatches.length !== 1 ? 'es' : ''} • Predictions calculated from team stats • ✅ = Correct ❌ = Wrong
                                 </div>
                                 {currentMatches.map(match => (
                                     <MatchCard key={match.id} match={match} />
