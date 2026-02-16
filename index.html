@@ -78,8 +78,19 @@
                     
                     const fixturesData = await fixturesRes.json();
                     
+                    console.log('API Response:', fixturesData);
+                    console.log('Requests remaining:', fixturesRes.headers.get('x-ratelimit-requests-remaining'));
+                    
                     if (fixturesData.errors && Object.keys(fixturesData.errors).length > 0) {
-                        throw new Error(JSON.stringify(fixturesData.errors));
+                        const errorMsg = JSON.stringify(fixturesData.errors);
+                        console.error('API Errors:', errorMsg);
+                        
+                        // Check if it's a subscription error
+                        if (errorMsg.includes('subscription') || errorMsg.includes('plan')) {
+                            throw new Error('⚠️ Your API plan may not include the 2025-2026 season. Please upgrade to PRO or contact API-Football support.');
+                        }
+                        
+                        throw new Error(errorMsg);
                     }
 
                     // Fetch standings for league position
@@ -340,9 +351,10 @@
                 <div className="min-h-screen pb-6">
                     <div className="max-w-6xl mx-auto px-3 pt-4">
                         <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-3 rounded-xl mb-4 text-center shadow-lg">
-                            <div className="font-bold text-sm">🎉 LIVE DATA - Real 2024/25 Season</div>
+                            <div className="font-bold text-sm">🎉 LIVE DATA - 2025/26 Season</div>
                             <div className="text-xs opacity-90 mt-1">
                                 {lastUpdate && `Last updated: ${lastUpdate.toLocaleTimeString()}`}
+                                <div className="mt-1">League: {leagues[selectedLeague].name} | Date: {selectedDate} | Season: 2025</div>
                             </div>
                         </div>
 
