@@ -191,103 +191,111 @@
                     });
                     
                     setH2hData(h2hLookup);
-                    
-                    // Fetch events data for late goal analysis (last 10 matches per team for season stats)
+
+                    // Step 1: Fetch last 10 fixtures per unique team - ALL IN PARALLEL
                     const processedTeams = new Set();
-                    const eventsPromises = [];
-                    
+                    const teamFixturePromises = [];
+
                     (fixturesData.response || []).slice(0, 10).forEach(match => {
                         [match.teams.home.id, match.teams.away.id].forEach(teamId => {
                             if (!processedTeams.has(teamId)) {
                                 processedTeams.add(teamId);
-                                eventsPromises.push(
+                                teamFixturePromises.push(
                                     fetch(
                                         `${API_BASE}/fixtures?team=${teamId}&last=10&season=${leagues[selectedLeague].season}`,
                                         { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
-                                    ).then(res => res.json()).then(data => ({ teamId, fixtures: data.response || [] }))
-                                    .catch(err => ({ teamId, fixtures: [] }))
+                                    ).then(res => res.json())
+                                    .then(data => ({ teamId, fixtures: data.response || [] }))
+                                    .catch(() => ({ teamId, fixtures: [] }))
                                 );
                             }
                         });
                     });
-                    
-                    const eventsResults = await Promise.all(eventsPromises);
-                    const eventsLookup = {};
-                    
-                    // Process each team's fixtures to calculate late goal stats AND home/away form
-                    for (const result of eventsResults) {
-                        const teamId = result.teamId;
-                        let totalGoals = 0;
-                        let lateGoalsScored = 0;
-                        let lateGoalsConceded = 0;
 
-                        // Separate home and away fixtures
-                        const homeFixtures = result.fixtures
+                    // Fetch all team fixtures simultaneously
+                    const teamFixtureResults = await Promise.all(teamFixturePromises);
+                    const eventsLookup = {};
+
+                    // Step 2: Build home/away form immediately from fixture results (NO extra API calls!)
+                    const lateGoalFixtureIds = [];
+
+                    teamFixtureResults.forEach(({ teamId, fixtures }) => {
+                        const homeFixtures = fixtures
                             .filter(f => f.teams.home.id === teamId && f.fixture.status.short === 'FT')
                             .slice(-5);
-                        const awayFixtures = result.fixtures
+                        const awayFixtures = fixtures
                             .filter(f => f.teams.away.id === teamId && f.fixture.status.short === 'FT')
                             .slice(-5);
 
-                        // Build home form string from actual home results
-                        const homeForm = homeFixtures.map(f => {
-                            const scored = f.goals.home;
-                            const conceded = f.goals.away;
-                            if (scored > conceded) return 'W';
-                            if (scored < conceded) return 'L';
-                            return 'D';
-                        });
+                        const homeForm = homeFixtures.map(f =>
+                            f.goals.home > f.goals.away ? 'W' : f.goals.home < f.goals.away ? 'L' : 'D'
+                        );
+                        const awayForm = awayFixtures.map(f =>
+                            f.goals.away > f.goals.home ? 'W' : f.goals.away < f.goals.home ? 'L' : 'D'
+                        );
 
-                        // Build away form string from actual away results
-                        const awayForm = awayFixtures.map(f => {
-                            const scored = f.goals.away;
-                            const conceded = f.goals.home;
-                            if (scored > conceded) return 'W';
-                            if (scored < conceded) return 'L';
-                            return 'D';
-                        });
-                        
-                        for (const fixture of result.fixtures) {
-                            if (fixture.fixture.status.short === 'FT') {
-                                // Get events for this fixture
-                                try {
-                                    const eventsRes = await fetch(
-                                        `${API_BASE}/fixtures/events?fixture=${fixture.fixture.id}`,
-                                        { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
-                                    );
-                                    const eventsData = await eventsRes.json();
-                                    
-                                    (eventsData.response || []).forEach(event => {
-                                        if (event.type === 'Goal' && !event.detail.includes('Penalty')) {
-                                            const minute = parseInt(event.time.elapsed);
-                                            if (minute >= 75) {
-                                                if (event.team.id === teamId) {
-                                                    lateGoalsScored++;
-                                                } else {
-                                                    lateGoalsConceded++;
-                                                }
-                                            }
-                                            if (event.team.id === teamId) totalGoals++;
-                                        }
-                                    });
-                                } catch (err) {
-                                    console.error('Events fetch error:', err);
+                        eventsLookup[teamId] = { homeForm, awayForm, totalGoals: 0, lateGoalsScored: 0, lateGoalScoredPct: 0 };
+
+                        // Collect fixture IDs for late goal events (last 5 finished only)
+                        fixtures
+                            .filter(f => f.fixture.status.short === 'FT')
+                            .slice(-5)
+                            .forEach(f => {
+                                if (!lateGoalFixtureIds.find(x => x.fixtureId === f.fixture.id)) {
+                                    lateGoalFixtureIds.push({ fixtureId: f.fixture.id, teamId });
                                 }
-                            }
-                        }
-                        
-                        eventsLookup[teamId] = {
-                            totalGoals,
-                            lateGoalsScored,
-                            lateGoalsConceded,
-                            lateGoalScoredPct: totalGoals > 0 ? Math.round((lateGoalsScored / totalGoals) * 100) : 0,
-                            lateGoalConcededPct: totalGoals > 0 ? Math.round((lateGoalsConceded / totalGoals) * 100) : 0,
-                            homeForm, // actual last 5 home results
-                            awayForm  // actual last 5 away results
-                        };
-                    }
-                    
-                    setEventsData(eventsLookup);
+                            });
+                    });
+
+                    // Show form immediately - don't wait for late goals
+                    setEventsData({ ...eventsLookup });
+                    setLastUpdate(new Date());
+
+                    // Step 3: Fetch ALL late goal events in PARALLEL (not one by one!)
+                    const uniqueFixtureIds = [...new Map(lateGoalFixtureIds.map(x => [x.fixtureId, x])).values()];
+                    const lateGoalPromises = uniqueFixtureIds.map(({ fixtureId }) =>
+                        fetch(
+                            `${API_BASE}/fixtures/events?fixture=${fixtureId}`,
+                            { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
+                        ).then(res => res.json())
+                        .then(data => ({ fixtureId, events: data.response || [] }))
+                        .catch(() => ({ fixtureId, events: [] }))
+                    );
+
+                    const lateGoalResults = await Promise.all(lateGoalPromises);
+
+                    // Process late goals per team
+                    lateGoalResults.forEach(({ fixtureId, events }) => {
+                        // Find which teams played in this fixture
+                        const teamsInFixture = lateGoalFixtureIds
+                            .filter(x => x.fixtureId === fixtureId)
+                            .map(x => x.teamId);
+
+                        teamsInFixture.forEach(teamId => {
+                            if (!eventsLookup[teamId]) return;
+                            events.forEach(event => {
+                                if (event.type === 'Goal' && event.detail !== 'Missed Penalty') {
+                                    if (event.team.id === teamId) {
+                                        eventsLookup[teamId].totalGoals++;
+                                        if (parseInt(event.time.elapsed) >= 75) {
+                                            eventsLookup[teamId].lateGoalsScored++;
+                                        }
+                                    }
+                                }
+                            });
+                        });
+                    });
+
+                    // Update late goal percentages
+                    Object.keys(eventsLookup).forEach(teamId => {
+                        const d = eventsLookup[teamId];
+                        d.lateGoalScoredPct = d.totalGoals > 0
+                            ? Math.round((d.lateGoalsScored / d.totalGoals) * 100)
+                            : 0;
+                    });
+
+                    // Final update with late goal data
+                    setEventsData({ ...eventsLookup });
                     setLastUpdate(new Date());
                     
                 } catch (err) {
