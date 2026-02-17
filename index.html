@@ -35,6 +35,8 @@
             const [matches, setMatches] = useState([]);
             const [standings, setStandings] = useState({});
             const [h2hData, setH2hData] = useState({});
+            const [eventsData, setEventsData] = useState({});
+            const [statsFilter, setStatsFilter] = useState('season'); // 'season' or 'last5'
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
             const [lastUpdate, setLastUpdate] = useState(null);
@@ -189,6 +191,103 @@
                     });
                     
                     setH2hData(h2hLookup);
+                    
+                    // Fetch events data for late goal analysis (last 10 matches per team for season stats)
+                    const processedTeams = new Set();
+                    const eventsPromises = [];
+                    
+                    (fixturesData.response || []).slice(0, 10).forEach(match => {
+                        [match.teams.home.id, match.teams.away.id].forEach(teamId => {
+                            if (!processedTeams.has(teamId)) {
+                                processedTeams.add(teamId);
+                                eventsPromises.push(
+                                    fetch(
+                                        `${API_BASE}/fixtures?team=${teamId}&last=10&season=${leagues[selectedLeague].season}`,
+                                        { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
+                                    ).then(res => res.json()).then(data => ({ teamId, fixtures: data.response || [] }))
+                                    .catch(err => ({ teamId, fixtures: [] }))
+                                );
+                            }
+                        });
+                    });
+                    
+                    const eventsResults = await Promise.all(eventsPromises);
+                    const eventsLookup = {};
+                    
+                    // Process each team's fixtures to calculate late goal stats AND home/away form
+                    for (const result of eventsResults) {
+                        const teamId = result.teamId;
+                        let totalGoals = 0;
+                        let lateGoalsScored = 0;
+                        let lateGoalsConceded = 0;
+
+                        // Separate home and away fixtures
+                        const homeFixtures = result.fixtures
+                            .filter(f => f.teams.home.id === teamId && f.fixture.status.short === 'FT')
+                            .slice(-5);
+                        const awayFixtures = result.fixtures
+                            .filter(f => f.teams.away.id === teamId && f.fixture.status.short === 'FT')
+                            .slice(-5);
+
+                        // Build home form string from actual home results
+                        const homeForm = homeFixtures.map(f => {
+                            const scored = f.goals.home;
+                            const conceded = f.goals.away;
+                            if (scored > conceded) return 'W';
+                            if (scored < conceded) return 'L';
+                            return 'D';
+                        });
+
+                        // Build away form string from actual away results
+                        const awayForm = awayFixtures.map(f => {
+                            const scored = f.goals.away;
+                            const conceded = f.goals.home;
+                            if (scored > conceded) return 'W';
+                            if (scored < conceded) return 'L';
+                            return 'D';
+                        });
+                        
+                        for (const fixture of result.fixtures) {
+                            if (fixture.fixture.status.short === 'FT') {
+                                // Get events for this fixture
+                                try {
+                                    const eventsRes = await fetch(
+                                        `${API_BASE}/fixtures/events?fixture=${fixture.fixture.id}`,
+                                        { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
+                                    );
+                                    const eventsData = await eventsRes.json();
+                                    
+                                    (eventsData.response || []).forEach(event => {
+                                        if (event.type === 'Goal' && !event.detail.includes('Penalty')) {
+                                            const minute = parseInt(event.time.elapsed);
+                                            if (minute >= 75) {
+                                                if (event.team.id === teamId) {
+                                                    lateGoalsScored++;
+                                                } else {
+                                                    lateGoalsConceded++;
+                                                }
+                                            }
+                                            if (event.team.id === teamId) totalGoals++;
+                                        }
+                                    });
+                                } catch (err) {
+                                    console.error('Events fetch error:', err);
+                                }
+                            }
+                        }
+                        
+                        eventsLookup[teamId] = {
+                            totalGoals,
+                            lateGoalsScored,
+                            lateGoalsConceded,
+                            lateGoalScoredPct: totalGoals > 0 ? Math.round((lateGoalsScored / totalGoals) * 100) : 0,
+                            lateGoalConcededPct: totalGoals > 0 ? Math.round((lateGoalsConceded / totalGoals) * 100) : 0,
+                            homeForm, // actual last 5 home results
+                            awayForm  // actual last 5 away results
+                        };
+                    }
+                    
+                    setEventsData(eventsLookup);
                     setLastUpdate(new Date());
                     
                 } catch (err) {
@@ -204,7 +303,7 @@
             }, [selectedLeague, selectedDate]);
 
             // Enhanced prediction calculator with H2H and weighted recent form
-            const calculateProbabilities = (homeTeamId, awayTeamId) => {
+            const calculateProbabilities = (homeTeamId, awayTeamId, filterType = 'season') => {
                 const homeData = standings[homeTeamId];
                 const awayData = standings[awayTeamId];
                 const h2hKey = `${homeTeamId}-${awayTeamId}`;
@@ -221,7 +320,6 @@
                 const awayDefenseAway = awayData.played > 0 ? (awayData.awayGoalsAgainst / (awayData.played / 2)) : 0;
 
                 // === 1. RECENT FORM ANALYSIS (Weighted) ===
-                // Last 5 games with more weight on recent matches
                 const getWeightedFormScore = (formString) => {
                     if (!formString) return 0;
                     const results = formString.slice(-5).split('');
@@ -252,7 +350,6 @@
                     const homeGoals = match.teams.home.id === homeTeamId ? match.goals.home : match.goals.away;
                     const awayGoals = match.teams.away.id === awayTeamId ? match.goals.away : match.goals.home;
                     
-                    // Check if at same venue (home team's venue)
                     const atHomeVenue = match.teams.home.id === homeTeamId;
                     
                     if (homeGoals > awayGoals) {
@@ -285,20 +382,35 @@
                 const positionBonus = positionDiff * 0.5;
 
                 // === 4. CALCULATE WIN PROBABILITIES ===
-                // Weighting: Form 25%, H2H 20%, Position 15%, Home 12%, Goals 28%
+                // Adjust weighting based on filter type
+                let formWeight, h2hWeight, positionWeight, goalsWeight;
+                
+                if (filterType === 'last5') {
+                    // Last 5 Games mode: Emphasize recent form heavily
+                    formWeight = 0.40;  // 40% form (up from 25%)
+                    h2hWeight = 0.15;   // 15% H2H (down from 20%)
+                    positionWeight = 0.10; // 10% position (down from 15%)
+                    goalsWeight = 1.0;  // 35% goals (up from 28%)
+                } else {
+                    // Season mode: Balanced approach
+                    formWeight = 0.25;  // 25% form
+                    h2hWeight = 0.20;   // 20% H2H
+                    positionWeight = 0.15; // 15% position
+                    goalsWeight = 0.56; // 28% goals (5 * 0.56 = 2.8% per goal diff)
+                }
                 
                 let homeWin = 40; // Base
                 homeWin += homeAdvantage; // +12%
-                homeWin += positionBonus; // League position
-                homeWin += (formDifference * 0.25); // Recent form (weighted)
-                homeWin += ((h2hHomeWinRate - 33) * 0.20); // H2H history
-                homeWin += goalDifference; // Expected goals
+                homeWin += positionBonus * (positionWeight / 0.15); // Adjusted position impact
+                homeWin += (formDifference * formWeight); // Adjusted form impact
+                homeWin += ((h2hHomeWinRate - 33) * h2hWeight); // Adjusted H2H
+                homeWin += goalDifference * goalsWeight; // Adjusted goals impact
                 
                 let awayWin = 40; // Base
-                awayWin -= positionBonus; // League position
-                awayWin -= (formDifference * 0.25); // Recent form
-                awayWin += ((h2hAwayWinRate - 33) * 0.20); // H2H history
-                awayWin -= goalDifference; // Expected goals
+                awayWin -= positionBonus * (positionWeight / 0.15);
+                awayWin -= (formDifference * formWeight);
+                awayWin += ((h2hAwayWinRate - 33) * h2hWeight);
+                awayWin -= goalDifference * goalsWeight;
                 
                 // Apply limits
                 homeWin = Math.max(15, Math.min(85, homeWin));
@@ -313,21 +425,63 @@
                 awayWin = Math.round((awayWin / total) * 100);
                 draw = 100 - homeWin - awayWin;
 
-                // === 5. BTTS CALCULATION (with H2H) ===
-                const homeScoringProb = Math.min(95, (homeAttackHome / 3) * 100);
-                const awayScoringProb = Math.min(95, (awayAttackAway / 3) * 100);
-                const seasonBtts = (homeScoringProb + awayScoringProb) / 2;
+                // === 5. IMPROVED BTTS CALCULATION ===
+                // P(home scores) × P(away scores) with defensive adjustments
+
+                // How often does home team score at home? (as a probability 0-1)
+                const homeScoreRate = homeAttackHome > 0 
+                    ? Math.min(0.95, homeAttackHome / 2.5) 
+                    : 0.5;
+
+                // How often does away team score away? (as a probability 0-1)
+                const awayScoreRate = awayAttackAway > 0 
+                    ? Math.min(0.95, awayAttackAway / 2.5) 
+                    : 0.5;
+
+                // Defensive strength (0-1, higher = weaker defense)
+                // Average goals conceded per game scaled against league average of 1.2
+                const homeDefenseWeakness = Math.min(1.5, homeDefenseHome / 1.2);
+                const awayDefenseWeakness = Math.min(1.5, awayDefenseAway / 1.2);
+
+                // Adjust scoring probability based on opponent's defense
+                // Strong defense (weakness < 1) reduces scoring chance
+                // Weak defense (weakness > 1) increases scoring chance
+                let adjHomeScoreProb, adjAwayScoreProb;
+
+                if (filterType === 'last5') {
+                    // Last 5 mode - use weighted form score to estimate scoring
+                    adjHomeScoreProb = Math.min(0.95, (0.5 + homeFormScore * 0.45) * awayDefenseWeakness);
+                    adjAwayScoreProb = Math.min(0.95, (0.5 + awayFormScore * 0.45) * homeDefenseWeakness);
+                } else {
+                    // Season mode - use actual goals data adjusted for opponent defense
+                    adjHomeScoreProb = Math.min(0.95, homeScoreRate * awayDefenseWeakness);
+                    adjAwayScoreProb = Math.min(0.95, awayScoreRate * homeDefenseWeakness);
+                }
+
+                // True BTTS = P(home scores) × P(away scores)
+                const seasonBtts = Math.round(adjHomeScoreProb * adjAwayScoreProb * 100);
+
+                // Blend with H2H BTTS history
+                const h2hBlendWeight = filterType === 'last5' ? 0.25 : 0.30;
+                const btts = h2hTotal > 0
+                    ? Math.round(seasonBtts * (1 - h2hBlendWeight) + h2hBttsRate * h2hBlendWeight)
+                    : seasonBtts;
+
+                // === 6. LATE GOAL PREDICTION ===
+                const homeEvents = eventsData[homeTeamId];
+                const awayEvents = eventsData[awayTeamId];
+                const homeLateGoalPct = homeEvents ? homeEvents.lateGoalScoredPct : 25;
+                const awayLateGoalPct = awayEvents ? awayEvents.lateGoalScoredPct : 25;
                 
-                // Blend season stats (70%) with H2H stats (30%)
-                const btts = h2hTotal > 0 
-                    ? Math.round(seasonBtts * 0.7 + h2hBttsRate * 0.3)
-                    : Math.round(seasonBtts);
+                // Combined probability of a late goal (either team)
+                const lateGoal = Math.min(95, Math.round((homeLateGoalPct + awayLateGoalPct) / 1.5));
 
                 return {
                     homeWin,
                     draw,
                     awayWin,
                     btts,
+                    lateGoal,
                     homeBttsWin: Math.round((homeWin / 100) * (btts / 100) * 100),
                     awayBttsWin: Math.round((awayWin / 100) * (btts / 100) * 100),
                     h2hStats: h2hTotal > 0 ? {
@@ -341,10 +495,29 @@
                 };
             };
 
-            // Calculate team stats from standings
-            const getTeamStats = (teamId, isHome) => {
+            // Calculate team stats from standings (can be season or last 5 games)
+            const getTeamStats = (teamId, isHome, filterType = 'season') => {
                 const data = standings[teamId];
-                if (!data) return { over15: 70, over25: 50, over35: 30, btts: 60, scored: 75, conceded: 60 };
+                const events = eventsData[teamId];
+                
+                if (!data) return { over15: 70, over25: 50, over35: 30, btts: 60, scored: 75, conceded: 60, late: 25 };
+
+                if (filterType === 'last5' && data.form) {
+                    const formResults = data.form.slice(-5).split('');
+                    const wins = formResults.filter(r => r === 'W').length;
+                    const draws = formResults.filter(r => r === 'D').length;
+                    const formStrength = (wins * 3 + draws) / 15;
+                    
+                    return {
+                        over15: Math.min(95, Math.round(60 + formStrength * 30)),
+                        over25: Math.min(95, Math.round(45 + formStrength * 35)),
+                        over35: Math.min(95, Math.round(25 + formStrength * 30)),
+                        btts: Math.min(95, Math.round(50 + formStrength * 25)),
+                        scored: Math.min(95, Math.round(60 + formStrength * 30)),
+                        conceded: Math.min(95, Math.round(40 + (1 - formStrength) * 40)),
+                        late: events ? events.lateGoalScoredPct : 25
+                    };
+                }
 
                 const played = isHome ? (data.played / 2) : (data.played / 2);
                 const goalsFor = isHome ? data.homeGoalsFor : data.awayGoalsFor;
@@ -360,7 +533,8 @@
                     over35: Math.min(95, Math.round((avgTotal / 5) * 100)),
                     btts: Math.min(95, Math.round(((avgGoalsFor > 0.7 ? 70 : 40) + (avgGoalsAgainst > 0.7 ? 70 : 40)) / 2)),
                     scored: Math.min(95, Math.round((avgGoalsFor / 2) * 100)),
-                    conceded: Math.min(95, Math.round((avgGoalsAgainst / 2) * 100))
+                    conceded: Math.min(95, Math.round((avgGoalsAgainst / 2) * 100)),
+                    late: events ? events.lateGoalScoredPct : 25
                 };
             };
 
@@ -381,9 +555,9 @@
             const MatchCard = ({ match }) => {
                 const homeTeamId = match.teams.home.id;
                 const awayTeamId = match.teams.away.id;
-                const homeStats = getTeamStats(homeTeamId, true);
-                const awayStats = getTeamStats(awayTeamId, false);
-                const prob = calculateProbabilities(homeTeamId, awayTeamId);
+                const homeStats = getTeamStats(homeTeamId, true, statsFilter);
+                const awayStats = getTeamStats(awayTeamId, false, statsFilter);
+                const prob = calculateProbabilities(homeTeamId, awayTeamId, statsFilter);
 
                 const homeScore = match.goals.home;
                 const awayScore = match.goals.away;
@@ -404,7 +578,7 @@
                                 <div className="text-xs font-bold text-gray-700">🎯 PREDICTIONS</div>
                                 {prob.h2hStats && (
                                     <div className="text-xs text-gray-600">
-                                        H2H: {prob.h2hStats.homeWins}W-{prob.h2hStats.draws}D-{prob.h2hStats.awayWins}L (Last {prob.h2hStats.total})
+                                        H2H Home Team Form: {prob.h2hStats.homeWins}W-{prob.h2hStats.draws}D-{prob.h2hStats.awayWins}L (Last {prob.h2hStats.total})
                                     </div>
                                 )}
                             </div>
@@ -425,18 +599,24 @@
                             </div>
 
                             <div className="grid grid-cols-3 gap-2 mb-1">
-                                <div className="bg-purple-100 border border-purple-300 rounded p-2 text-center">
-                                    <div className="text-xs text-purple-700">BTTS</div>
-                                    <div className="text-sm font-bold text-purple-700">{prob.btts}%</div>
-                                </div>
                                 <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
                                     <div className="text-xs text-green-700">Home BTTS+W</div>
                                     <div className="text-sm font-bold text-green-700">{prob.homeBttsWin}%</div>
+                                </div>
+                                <div className="bg-purple-100 border border-purple-300 rounded p-2 text-center">
+                                    <div className="text-xs text-purple-700">BTTS</div>
+                                    <div className="text-sm font-bold text-purple-700">{prob.btts}%</div>
                                 </div>
                                 <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
                                     <div className="text-xs text-red-700">Away BTTS+W</div>
                                     <div className="text-sm font-bold text-red-700">{prob.awayBttsWin}%</div>
                                 </div>
+                            </div>
+                            
+                            {/* Late Goal Prediction */}
+                            <div className="bg-orange-100 border border-orange-300 rounded p-2 text-center">
+                                <div className="text-xs text-orange-700">⏰ Late Goal (75'+)</div>
+                                <div className="text-sm font-bold text-orange-700">{prob.lateGoal}%</div>
                             </div>
                             
                             {prob.h2hStats && (
@@ -457,6 +637,7 @@
                                         <th className="table-header">BTTS</th>
                                         <th className="table-header">Scored</th>
                                         <th className="table-header">Conc</th>
+                                        <th className="table-header">Late</th>
                                         {homeScore !== null && <th className="table-header">Score</th>}
                                     </tr>
                                 </thead>
@@ -472,6 +653,7 @@
                                         <td className="stat-cell text-purple-700">{homeStats.btts}%</td>
                                         <td className="stat-cell text-green-700">{homeStats.scored}%</td>
                                         <td className="stat-cell text-red-700">{homeStats.conceded}%</td>
+                                        <td className="stat-cell text-orange-700 font-bold">{homeStats.late}%</td>
                                         {homeScore !== null && (
                                             <td className="stat-cell text-blue-700 font-bold text-base">{homeScore}</td>
                                         )}
@@ -488,6 +670,7 @@
                                         <td className="stat-cell text-purple-700">{awayStats.btts}%</td>
                                         <td className="stat-cell text-green-700">{awayStats.scored}%</td>
                                         <td className="stat-cell text-red-700">{awayStats.conceded}%</td>
+                                        <td className="stat-cell text-orange-700 font-bold">{awayStats.late}%</td>
                                         {awayScore !== null && (
                                             <td className="stat-cell text-red-700 font-bold text-base">{awayScore}</td>
                                         )}
@@ -498,73 +681,53 @@
 
                         {/* Form Section */}
                         <div className="p-3 bg-gray-50 border-t">
-                            {/* Home/Away Specific Form */}
+                            {/* Row 1: Home specific form vs Away specific form */}
                             <div className="grid grid-cols-2 gap-3 mb-2">
                                 <div className="text-center">
-                                    <div className="text-xs font-semibold text-blue-700 mb-1">🏠 Home Form (Last 5)</div>
-                                    <div className="text-xs text-gray-600">
-                                        {standings[homeTeamId]?.form ? 
-                                            standings[homeTeamId].form.slice(-5).split('').map((result, i) => (
-                                                <span key={i} className={`inline-block w-5 h-5 leading-5 rounded mx-0.5 ${
-                                                    result === 'W' ? 'bg-green-500 text-white' : 
-                                                    result === 'D' ? 'bg-yellow-500 text-white' : 
-                                                    'bg-red-500 text-white'
-                                                }`}>
-                                                    {result}
-                                                </span>
-                                            )) : 'N/A'
+                                    <div className="text-xs font-semibold text-blue-700 mb-1">🏠 Last 5 Home Games</div>
+                                    <div className="flex justify-center gap-0.5">
+                                        {eventsData[homeTeamId]?.homeForm?.length > 0 ?
+                                            eventsData[homeTeamId].homeForm.map((r, i) => (
+                                                <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
+                                            ))
+                                            : <span className="text-xs text-gray-400">Loading...</span>
                                         }
                                     </div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-xs font-semibold text-red-700 mb-1">✈️ Away Form (Last 5)</div>
-                                    <div className="text-xs text-gray-600">
-                                        {standings[awayTeamId]?.form ? 
-                                            standings[awayTeamId].form.slice(-5).split('').map((result, i) => (
-                                                <span key={i} className={`inline-block w-5 h-5 leading-5 rounded mx-0.5 ${
-                                                    result === 'W' ? 'bg-green-500 text-white' : 
-                                                    result === 'D' ? 'bg-yellow-500 text-white' : 
-                                                    'bg-red-500 text-white'
-                                                }`}>
-                                                    {result}
-                                                </span>
-                                            )) : 'N/A'
+                                    <div className="text-xs font-semibold text-red-700 mb-1">✈️ Last 5 Away Games</div>
+                                    <div className="flex justify-center gap-0.5">
+                                        {eventsData[awayTeamId]?.awayForm?.length > 0 ?
+                                            eventsData[awayTeamId].awayForm.map((r, i) => (
+                                                <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
+                                            ))
+                                            : <span className="text-xs text-gray-400">Loading...</span>
                                         }
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Overall Form (Home or Away) */}
+                            {/* Row 2: Overall last 5 games (home AND away mixed) from standings form string */}
                             <div className="grid grid-cols-2 gap-3 mb-2">
                                 <div className="text-center">
-                                    <div className="text-xs font-semibold text-gray-700 mb-1">All Games (Last 5)</div>
-                                    <div className="text-xs text-gray-600">
-                                        {standings[homeTeamId]?.form ? 
-                                            standings[homeTeamId].form.slice(-5).split('').map((result, i) => (
-                                                <span key={i} className={`inline-block w-5 h-5 leading-5 rounded mx-0.5 ${
-                                                    result === 'W' ? 'bg-green-500 text-white' : 
-                                                    result === 'D' ? 'bg-yellow-500 text-white' : 
-                                                    'bg-red-500 text-white'
-                                                }`}>
-                                                    {result}
-                                                </span>
-                                            )) : 'N/A'
+                                    <div className="text-xs font-semibold text-gray-600 mb-1">📊 Last 5 All Games</div>
+                                    <div className="flex justify-center gap-0.5">
+                                        {standings[homeTeamId]?.form ?
+                                            standings[homeTeamId].form.slice(-5).split('').map((r, i) => (
+                                                <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
+                                            ))
+                                            : <span className="text-xs text-gray-400">N/A</span>
                                         }
                                     </div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-xs font-semibold text-gray-700 mb-1">All Games (Last 5)</div>
-                                    <div className="text-xs text-gray-600">
-                                        {standings[awayTeamId]?.form ? 
-                                            standings[awayTeamId].form.slice(-5).split('').map((result, i) => (
-                                                <span key={i} className={`inline-block w-5 h-5 leading-5 rounded mx-0.5 ${
-                                                    result === 'W' ? 'bg-green-500 text-white' : 
-                                                    result === 'D' ? 'bg-yellow-500 text-white' : 
-                                                    'bg-red-500 text-white'
-                                                }`}>
-                                                    {result}
-                                                </span>
-                                            )) : 'N/A'
+                                    <div className="text-xs font-semibold text-gray-600 mb-1">📊 Last 5 All Games</div>
+                                    <div className="flex justify-center gap-0.5">
+                                        {standings[awayTeamId]?.form ?
+                                            standings[awayTeamId].form.slice(-5).split('').map((r, i) => (
+                                                <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
+                                            ))
+                                            : <span className="text-xs text-gray-400">N/A</span>
                                         }
                                     </div>
                                 </div>
@@ -588,7 +751,6 @@
                             <div className="font-bold text-sm">🎉 LIVE DATA - 2025/26 Season</div>
                             <div className="text-xs opacity-90 mt-1">
                                 {lastUpdate && `Last updated: ${lastUpdate.toLocaleTimeString()}`}
-                                <div className="mt-1">League: {leagues[selectedLeague].name} | Date: {selectedDate} | Season: 2025</div>
                             </div>
                         </div>
 
@@ -605,6 +767,19 @@
                                 >
                                     {loading ? '↻' : '🔄'} Refresh
                                 </button>
+                            </div>
+
+                            {/* Stats Filter Dropdown - Prominent */}
+                            <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                                <span className="text-xs font-semibold text-gray-700">📊 Stats View:</span>
+                                <select
+                                    value={statsFilter}
+                                    onChange={(e) => setStatsFilter(e.target.value)}
+                                    className="flex-1 text-xs px-3 py-2 border border-blue-300 rounded-lg bg-white font-semibold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                >
+                                    <option value="season">📅 All Season Stats</option>
+                                    <option value="last5">🔥 Last 5 Games</option>
+                                </select>
                             </div>
                             
                             <div className="mb-3">
