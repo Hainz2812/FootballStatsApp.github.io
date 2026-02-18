@@ -375,11 +375,12 @@
                             .filter(f => f.teams.away.id === teamId)
                             .slice(-5);  // Last 5 AWAY games
 
-                        const calcStats = (games, isHome) => {
+                        const calcStats = (games, isHome, teamId) => {
                             if (games.length === 0) return null;
                             
                             console.log('=== CALCULATING STATS ===');
-                            console.log('isHome:', isHome);
+                            console.log('Team ID:', teamId);
+                            console.log('isHome:', isHome, '(looking for', isHome ? 'HOME' : 'AWAY', 'games)');
                             console.log('Games count:', games.length);
                             
                             let totalGoals = 0, scoredCount = 0, concededCount = 0, bttsCount = 0;
@@ -390,7 +391,8 @@
                                 const goalsAgainst = isHome ? g.goals.away : g.goals.home;
                                 const total = goalsFor + goalsAgainst;
 
-                                console.log(`${g.teams.home.name} ${g.goals.home}-${g.goals.away} ${g.teams.away.name} | Total: ${total} | O2.5: ${total > 2.5}`);
+                                const teamName = isHome ? g.teams.home.name : g.teams.away.name;
+                                console.log(`${g.teams.home.name} ${g.goals.home}-${g.goals.away} ${g.teams.away.name} | Team: ${teamName} | Total: ${total} | O2.5: ${total > 2.5 ? 'YES' : 'NO'}`);
 
                                 totalGoals += total;
                                 if (goalsFor > 0) scoredCount++;
@@ -401,7 +403,8 @@
                                 if (total > 3.5) over35++;
                             });
 
-                            console.log('Over 2.5 games:', over25, '/', games.length, '=', Math.round((over25 / games.length) * 100) + '%');
+                            console.log('Over 1.5:', over15, 'Over 2.5:', over25, 'Over 3.5:', over35);
+                            console.log('O2.5 =', over25, '/', games.length, '=', Math.round((over25 / games.length) * 100) + '%');
 
                             return {
                                 over15: Math.round((over15 / games.length) * 100),
@@ -415,8 +418,8 @@
                         };
 
                         const stats = {
-                            homeStats: calcStats(homeGames, true),
-                            awayStats: calcStats(awayGames, false)
+                            homeStats: calcStats(homeGames, true, teamId),
+                            awayStats: calcStats(awayGames, false, teamId)
                         };
 
                         last5Lookup[teamId] = stats;
@@ -634,61 +637,32 @@
                 };
             };
 
-            // Calculate team stats from standings (can be season or last 5 games)
-            const getTeamStats = (teamId, isHome, filterType = 'season') => {
-                const data = standings[teamId];
-                const events = eventsData[teamId];
+            // Calculate team stats - ONLY from last 5 games (no season data)
+            const getTeamStats = (teamId, isHome) => {
                 const last5 = last5Data[teamId];
+                const events = eventsData[teamId];
                 
-                if (!data) return { over15: 70, over25: 50, over35: 30, btts: 60, scored: 75, conceded: 60, late: 25 };
-
-                // Use REAL last 5 data if available
-                if (filterType === 'last5' && last5) {
+                // Always use last 5 data
+                if (last5) {
                     const stats = isHome ? last5.homeStats : last5.awayStats;
                     
                     if (stats) {
                         return {
                             ...stats,
-                            late: events ? (isHome ? events.lateHomeGoalPct : events.lateAwayGoalPct) : 25
-                        };
-                    }
-                    
-                    // Fallback to estimation if no home/away specific data
-                    if (data.form) {
-                        const formResults = data.form.slice(-5).split('');
-                        const wins = formResults.filter(r => r === 'W').length;
-                        const draws = formResults.filter(r => r === 'D').length;
-                        const formStrength = (wins * 3 + draws) / 15;
-                        
-                        return {
-                            over15: Math.min(95, Math.round(60 + formStrength * 30)),
-                            over25: Math.min(95, Math.round(45 + formStrength * 35)),
-                            over35: Math.min(95, Math.round(25 + formStrength * 30)),
-                            btts: Math.min(95, Math.round(50 + formStrength * 25)),
-                            scored: Math.min(95, Math.round(60 + formStrength * 30)),
-                            conceded: Math.min(95, Math.round(40 + (1 - formStrength) * 40)),
-                            late: events ? (isHome ? events.lateHomeGoalPct : events.lateAwayGoalPct) : 25
+                            late: events ? (isHome ? events.lateHomeGoalPct : events.lateAwayGoalPct) : 0
                         };
                     }
                 }
-
-                // Season stats (default)
-                const played = isHome ? (data.played / 2) : (data.played / 2);
-                const goalsFor = isHome ? data.homeGoalsFor : data.awayGoalsFor;
-                const goalsAgainst = isHome ? data.homeGoalsAgainst : data.awayGoalsAgainst;
-
-                const avgGoalsFor = played > 0 ? goalsFor / played : 0;
-                const avgGoalsAgainst = played > 0 ? goalsAgainst / played : 0;
-                const avgTotal = avgGoalsFor + avgGoalsAgainst;
-
-                return {
-                    over15: Math.min(95, Math.round((avgTotal / 3.5) * 100)),
-                    over25: Math.min(95, Math.round((avgTotal / 4) * 100)),
-                    over35: Math.min(95, Math.round((avgTotal / 5) * 100)),
-                    btts: Math.min(95, Math.round(((avgGoalsFor > 0.7 ? 70 : 40) + (avgGoalsAgainst > 0.7 ? 70 : 40)) / 2)),
-                    scored: Math.min(95, Math.round((avgGoalsFor / 2) * 100)),
-                    conceded: Math.min(95, Math.round((avgGoalsAgainst / 2) * 100)),
-                    late: events ? (isHome ? events.lateHomeGoalPct : events.lateAwayGoalPct) : 25
+                
+                // Fallback if no data available yet
+                return { 
+                    over15: 0, 
+                    over25: 0, 
+                    over35: 0, 
+                    btts: 0, 
+                    scored: 0, 
+                    conceded: 0, 
+                    late: 0 
                 };
             };
 
@@ -1097,17 +1071,9 @@ If no injuries found, return empty injuries array and green rating.`
                                 </div>
                             </div>
 
-                            {/* Stats Filter Dropdown - Prominent */}
-                            <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                                <span className="text-xs font-semibold text-gray-700">📊 Stats View:</span>
-                                <select
-                                    value={statsFilter}
-                                    onChange={(e) => setStatsFilter(e.target.value)}
-                                    className="flex-1 text-xs px-3 py-2 border border-blue-300 rounded-lg bg-white font-semibold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                >
-                                    <option value="last5">🔥 Last 5 Games (Real Data)</option>
-                                    <option value="season">📅 All Season Stats</option>
-                                </select>
+                            {/* Stats info - always Last 5 Games */}
+                            <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                                <span className="text-xs font-semibold text-blue-700">📊 Stats View: Last 5 Games (Real Data)</span>
                             </div>
                             
                             <div className="mb-3">
