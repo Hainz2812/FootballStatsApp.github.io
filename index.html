@@ -378,6 +378,10 @@
                         const calcStats = (games, isHome) => {
                             if (games.length === 0) return null;
                             
+                            console.log('=== CALCULATING STATS ===');
+                            console.log('isHome:', isHome);
+                            console.log('Games count:', games.length);
+                            
                             let totalGoals = 0, scoredCount = 0, concededCount = 0, bttsCount = 0;
                             let over15 = 0, over25 = 0, over35 = 0;
 
@@ -386,22 +390,26 @@
                                 const goalsAgainst = isHome ? g.goals.away : g.goals.home;
                                 const total = goalsFor + goalsAgainst;
 
+                                console.log(`${g.teams.home.name} ${g.goals.home}-${g.goals.away} ${g.teams.away.name} | Total: ${total} | O2.5: ${total > 2.5}`);
+
                                 totalGoals += total;
-                                if (goalsFor > 0) scoredCount++;     // Count GAMES where scored
-                                if (goalsAgainst > 0) concededCount++; // Count GAMES where conceded
+                                if (goalsFor > 0) scoredCount++;
+                                if (goalsAgainst > 0) concededCount++;
                                 if (goalsFor > 0 && goalsAgainst > 0) bttsCount++;
                                 if (total > 1.5) over15++;
                                 if (total > 2.5) over25++;
                                 if (total > 3.5) over35++;
                             });
 
+                            console.log('Over 2.5 games:', over25, '/', games.length, '=', Math.round((over25 / games.length) * 100) + '%');
+
                             return {
                                 over15: Math.round((over15 / games.length) * 100),
                                 over25: Math.round((over25 / games.length) * 100),
                                 over35: Math.round((over35 / games.length) * 100),
                                 btts: Math.round((bttsCount / games.length) * 100),
-                                scored: Math.round((scoredCount / games.length) * 100),      // % of games scored
-                                conceded: Math.round((concededCount / games.length) * 100),  // % of games conceded
+                                scored: Math.round((scoredCount / games.length) * 100),
+                                conceded: Math.round((concededCount / games.length) * 100),
                                 avgGoals: (totalGoals / games.length).toFixed(1)
                             };
                         };
