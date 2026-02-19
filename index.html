@@ -2,1162 +2,183 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#2563eb">
-    <title>Live Football Stats</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Stats - Raw Data Debug</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        * { -webkit-tap-highlight-color: transparent; }
-        body { overscroll-behavior-y: contain; touch-action: pan-y; }
-        .safe-area { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-        .date-btn { min-width: 48px; }
-        .active-date { background: #2563eb; color: white; }
-        .stat-cell { text-align: center; padding: 0.375rem 0.5rem; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
-        .team-cell { padding: 0.5rem; font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
-        .table-header { background: #f3f4f6; font-weight: 700; font-size: 0.7rem; text-align: center; padding: 0.5rem 0.25rem; white-space: nowrap; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-    </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen safe-area">
+<body class="bg-gray-100 p-4">
     <div id="root"></div>
+    
     <script type="text/babel" data-type="module">
         const { useState, useEffect } = React;
 
         const API_KEY = '632b33b76e99fbebbde4c3a61ab67cac';
         const API_BASE = 'https://v3.football.api-sports.io';
 
-        const FootballApp = () => {
-            const [selectedLeague, setSelectedLeague] = useState('39');
-            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-            const [matches, setMatches] = useState([]);
-            const [standings, setStandings] = useState({});
-            const [h2hData, setH2hData] = useState({});
-            const [eventsData, setEventsData] = useState({});
-            const [last5Data, setLast5Data] = useState({});
-            const [statsFilter, setStatsFilter] = useState('last5'); // Default to last5
+        const App = () => {
+            const [match, setMatch] = useState(null);
+            const [homeGames, setHomeGames] = useState([]);
+            const [awayGames, setAwayGames] = useState([]);
             const [loading, setLoading] = useState(false);
-            const [error, setError] = useState(null);
-            const [lastUpdate, setLastUpdate] = useState(null);
 
-            const leagues = {
-                // English
-                '39': { name: 'Premier League', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: '2025' },
-                '40': { name: 'Championship', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: '2025' },
-                '41': { name: 'League One', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: '2025' },
-                '42': { name: 'League Two', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', season: '2025' },
-                
-                // Spanish
-                '140': { name: 'La Liga', flag: '🇪🇸', season: '2025' },
-                '141': { name: 'La Liga 2', flag: '🇪🇸', season: '2025' },
-                
-                // Italian
-                '135': { name: 'Serie A', flag: '🇮🇹', season: '2025' },
-                '136': { name: 'Serie B', flag: '🇮🇹', season: '2025' },
-                
-                // German
-                '78': { name: 'Bundesliga', flag: '🇩🇪', season: '2025' },
-                '79': { name: 'Bundesliga 2', flag: '🇩🇪', season: '2025' },
-                '80': { name: '3. Liga', flag: '🇩🇪', season: '2025' },
-                
-                // French
-                '61': { name: 'Ligue 1', flag: '🇫🇷', season: '2025' },
-                '62': { name: 'Ligue 2', flag: '🇫🇷', season: '2025' },
-                
-                // Dutch
-                '88': { name: 'Eredivisie', flag: '🇳🇱', season: '2025' },
-                '89': { name: 'Eerste Divisie', flag: '🇳🇱', season: '2025' },
-                
-                // Portuguese
-                '94': { name: 'Primeira Liga', flag: '🇵🇹', season: '2025' },
-                '95': { name: 'Liga Portugal 2', flag: '🇵🇹', season: '2025' },
-                
-                // Norwegian
-                '103': { name: 'Eliteserien', flag: '🇳🇴', season: '2025' },
-                '104': { name: '1. Division', flag: '🇳🇴', season: '2025' },
-                
-                // American
-                '253': { name: 'MLS', flag: '🇺🇸', season: '2025' },
-                
-                // Scottish
-                '179': { name: 'Premiership', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', season: '2025' },
-                '180': { name: 'Championship', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', season: '2025' },
-                
-                // Belgian
-                '144': { name: 'Pro League', flag: '🇧🇪', season: '2025' },
-                
-                // Turkish
-                '203': { name: 'Süper Lig', flag: '🇹🇷', season: '2025' },
-            };
-
-            const getDates = () => {
-                const dates = [];
-                const today = new Date();
-                for (let i = -1; i <= 7; i++) {
-                    const date = new Date(today);
-                    date.setDate(date.getDate() + i);
-                    dates.push({
-                        date: date.toISOString().split('T')[0],
-                        label: i === -1 ? 'Yesterday' : i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : 
-                               date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                    });
-                }
-                return dates;
-            };
-
-            const dates = getDates();
-
-            const fetchData = async () => {
+            const fetchWolvesArsenal = async () => {
                 setLoading(true);
-                setError(null);
-                
-                // Cache helpers - per day with version
-                const today = new Date().toISOString().split('T')[0];
-                const CACHE_VERSION = 'v3'; // Increment this to bust all caches
-                const getCacheKey = (type, id) => `${CACHE_VERSION}_${type}_${id}_${today}`;
-                const getCache = (key) => {
-                    try {
-                        const cached = localStorage.getItem(key);
-                        return cached ? JSON.parse(cached) : null;
-                    } catch { return null; }
-                };
-                const setCache = (key, data) => {
-                    try {
-                        localStorage.setItem(key, JSON.stringify(data));
-                    } catch (e) {
-                        console.warn('Cache full:', e);
-                    }
-                };
-                
                 try {
-                    // Fetch fixtures
+                    // Fetch today's fixtures
                     const fixturesRes = await fetch(
-                        `${API_BASE}/fixtures?league=${selectedLeague}&date=${selectedDate}&season=${leagues[selectedLeague].season}&timezone=Europe/London`,
+                        `${API_BASE}/fixtures?league=39&date=2025-02-19&season=2025`,
                         { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
                     );
-                    
                     const fixturesData = await fixturesRes.json();
+                    const wolvesMatch = (fixturesData.response || []).find(m => 
+                        m.teams.home.name.includes('Wolves') || m.teams.away.name.includes('Arsenal')
+                    );
                     
-                    console.log('API Response:', fixturesData);
-                    console.log('Requests remaining:', fixturesRes.headers.get('x-ratelimit-requests-remaining'));
-                    
-                    if (fixturesData.errors && Object.keys(fixturesData.errors).length > 0) {
-                        const errorMsg = JSON.stringify(fixturesData.errors);
-                        console.error('API Errors:', errorMsg);
-                        
-                        // Check if it's a subscription error
-                        if (errorMsg.includes('subscription') || errorMsg.includes('plan')) {
-                            throw new Error('⚠️ Your API plan may not include the 2025-2026 season. Please upgrade to PRO or contact API-Football support.');
-                        }
-                        
-                        throw new Error(errorMsg);
+                    if (!wolvesMatch) {
+                        alert('Wolves vs Arsenal match not found');
+                        return;
                     }
 
-                    // Fetch standings for league position
-                    const standingsRes = await fetch(
-                        `${API_BASE}/standings?league=${selectedLeague}&season=${leagues[selectedLeague].season}`,
+                    setMatch(wolvesMatch);
+                    const homeId = wolvesMatch.teams.home.id; // Wolves
+                    const awayId = wolvesMatch.teams.away.id; // Arsenal
+
+                    // Fetch Wolves last 10 fixtures
+                    const wolvesRes = await fetch(
+                        `${API_BASE}/fixtures?team=${homeId}&last=10&season=2025`,
                         { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
                     );
-                    
-                    const standingsData = await standingsRes.json();
-                    
-                    // Process standings into lookup
-                    const standingsLookup = {};
-                    if (standingsData.response && standingsData.response[0]) {
-                        // Flatten ALL standing groups (handles MLS conferences, playoff groups etc)
-                        const allGroups = standingsData.response[0].league.standings;
-                        allGroups.forEach(group => {
-                            group.forEach(team => {
-                                standingsLookup[team.team.id] = {
-                                    position: team.rank,
-                                    points: team.points,
-                                    goalsFor: team.all.goals.for,
-                                    goalsAgainst: team.all.goals.against,
-                                    played: team.all.played,
-                                    homeGoalsFor: team.home.goals.for,
-                                    homeGoalsAgainst: team.home.goals.against,
-                                    awayGoalsFor: team.away.goals.for,
-                                    awayGoalsAgainst: team.away.goals.against,
-                                    form: team.form
-                                };
-                            });
-                        });
-                    }
+                    const wolvesData = await wolvesRes.json();
+                    const wolvesAll = (wolvesData.response || []).filter(f => f.fixture.status.short === 'FT');
+                    const wolvesHome = wolvesAll.filter(f => f.teams.home.id === homeId).slice(-5);
+                    setHomeGames(wolvesHome);
 
-                    setStandings(standingsLookup);
-                    setMatches(fixturesData.response || []);
-                    
-                    // Fetch H2H for each match (in batches to save API calls)
-                    const h2hPromises = (fixturesData.response || []).slice(0, 10).map(async (match) => {
-                        try {
-                            const h2hRes = await fetch(
-                                `${API_BASE}/fixtures/headtohead?h2h=${match.teams.home.id}-${match.teams.away.id}&last=10`,
-                                { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
-                            );
-                            const h2hResult = await h2hRes.json();
-                            return {
-                                key: `${match.teams.home.id}-${match.teams.away.id}`,
-                                data: h2hResult.response || []
-                            };
-                        } catch (err) {
-                            console.error('H2H fetch error:', err);
-                            return { key: `${match.teams.home.id}-${match.teams.away.id}`, data: [] };
-                        }
-                    });
-                    
-                    const h2hResults = await Promise.all(h2hPromises);
-                    const h2hLookup = {};
-                    h2hResults.forEach(result => {
-                        h2hLookup[result.key] = result.data;
-                    });
-                    
-                    setH2hData(h2hLookup);
-
-                    // Step 1: Fetch last 10 fixtures per unique team - ALL IN PARALLEL
-                    const processedTeams = new Set();
-                    const teamFixturePromises = [];
-
-                    (fixturesData.response || []).slice(0, 10).forEach(match => {
-                        [match.teams.home.id, match.teams.away.id].forEach(teamId => {
-                            if (!processedTeams.has(teamId)) {
-                                processedTeams.add(teamId);
-                                teamFixturePromises.push(
-                                    fetch(
-                                        `${API_BASE}/fixtures?team=${teamId}&last=10&season=${leagues[selectedLeague].season}`,
-                                        { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
-                                    ).then(res => res.json())
-                                    .then(data => ({ teamId, fixtures: data.response || [] }))
-                                    .catch(() => ({ teamId, fixtures: [] }))
-                                );
-                            }
-                        });
-                    });
-
-                    // Fetch all team fixtures simultaneously
-                    const teamFixtureResults = await Promise.all(teamFixturePromises);
-                    const eventsLookup = {};
-
-                    // Step 2: Build home/away form immediately from fixture results (NO extra API calls!)
-                    const lateGoalFixtureIds = [];
-
-                    teamFixtureResults.forEach(({ teamId, fixtures }) => {
-                        const homeFixtures = fixtures
-                            .filter(f => f.teams.home.id === teamId && f.fixture.status.short === 'FT')
-                            .slice(-5);
-                        const awayFixtures = fixtures
-                            .filter(f => f.teams.away.id === teamId && f.fixture.status.short === 'FT')
-                            .slice(-5);
-
-                        const homeForm = homeFixtures.map(f =>
-                            f.goals.home > f.goals.away ? 'W' : f.goals.home < f.goals.away ? 'L' : 'D'
-                        );
-                        const awayForm = awayFixtures.map(f =>
-                            f.goals.away > f.goals.home ? 'W' : f.goals.away < f.goals.home ? 'L' : 'D'
-                        );
-
-                        eventsLookup[teamId] = { 
-                            homeForm, awayForm, 
-                            totalHomeGoals: 0, lateHomeGoalsScored: 0,
-                            totalAwayGoals: 0, lateAwayGoalsScored: 0,
-                            lateGoalScoredPct: 0
-                        };
-
-                        // Collect fixture IDs with venue info for late goal events (last 5 finished only)
-                        fixtures
-                            .filter(f => f.fixture.status.short === 'FT')
-                            .slice(-5)
-                            .forEach(f => {
-                                const isHome = f.teams.home.id === teamId;
-                                if (!lateGoalFixtureIds.find(x => x.fixtureId === f.fixture.id && x.teamId === teamId)) {
-                                    lateGoalFixtureIds.push({ fixtureId: f.fixture.id, teamId, isHome });
-                                }
-                            });
-                    });
-
-                    // Show form immediately - don't wait for late goals
-                    setEventsData({ ...eventsLookup });
-                    setLastUpdate(new Date());
-
-                    // Step 3: Fetch ALL late goal events in PARALLEL (not one by one!)
-                    const uniqueFixtureIds = [...new Map(lateGoalFixtureIds.map(x => [x.fixtureId, x])).values()];
-                    const lateGoalPromises = uniqueFixtureIds.map(({ fixtureId }) =>
-                        fetch(
-                            `${API_BASE}/fixtures/events?fixture=${fixtureId}`,
-                            { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
-                        ).then(res => res.json())
-                        .then(data => ({ fixtureId, events: data.response || [] }))
-                        .catch(() => ({ fixtureId, events: [] }))
+                    // Fetch Arsenal last 10 fixtures
+                    const arsenalRes = await fetch(
+                        `${API_BASE}/fixtures?team=${awayId}&last=10&season=2025`,
+                        { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
                     );
+                    const arsenalData = await arsenalRes.json();
+                    const arsenalAll = (arsenalData.response || []).filter(f => f.fixture.status.short === 'FT');
+                    const arsenalAway = arsenalAll.filter(f => f.teams.away.id === awayId).slice(-5);
+                    setAwayGames(arsenalAway);
 
-                    const lateGoalResults = await Promise.all(lateGoalPromises);
-
-                    // Process late goals per team
-                    lateGoalResults.forEach(({ fixtureId, events }) => {
-                        // Find which teams played in this fixture
-                        const teamsInFixture = lateGoalFixtureIds
-                            .filter(x => x.fixtureId === fixtureId)
-                            .map(x => x.teamId);
-
-                        teamsInFixture.forEach(teamId => {
-                            if (!eventsLookup[teamId]) return;
-                            events.forEach(event => {
-                                if (event.type === 'Goal' && event.detail !== 'Missed Penalty') {
-                                    if (event.team.id === teamId) {
-                                        eventsLookup[teamId].totalGoals++;
-                                        if (parseInt(event.time.elapsed) >= 75) {
-                                            eventsLookup[teamId].lateGoalsScored++;
-                                        }
-                                    }
-                                }
-                            });
-                        });
-                    });
-
-                    // Update late goal percentages
-                    Object.keys(eventsLookup).forEach(teamId => {
-                        const d = eventsLookup[teamId];
-                        d.lateGoalScoredPct = d.totalGoals > 0
-                            ? Math.round((d.lateGoalsScored / d.totalGoals) * 100)
-                            : 0;
-                    });
-
-                    // Final update with late goal data
-                    setEventsData({ ...eventsLookup });
-                    setLastUpdate(new Date());
-
-                    // Step 4: Fetch REAL last 5 games data for accurate stats (with cache)
-                    const last5Lookup = {};
-                    const last5Promises = [];
-
-                    processedTeams.clear();
-                    (fixturesData.response || []).slice(0, 10).forEach(match => {
-                        [match.teams.home.id, match.teams.away.id].forEach(teamId => {
-                            if (!processedTeams.has(teamId)) {
-                                processedTeams.add(teamId);
-                                
-                                // Check cache first
-                                const cacheKey = getCacheKey('last5', teamId);
-                                const cached = getCache(cacheKey);
-                                
-                                if (cached) {
-                                    last5Lookup[teamId] = cached;
-                                } else {
-                                    last5Promises.push(
-                                        fetch(
-                                            `${API_BASE}/fixtures?team=${teamId}&last=10&season=${leagues[selectedLeague].season}`,
-                                            { headers: { 'x-rapidapi-key': API_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' } }
-                                        ).then(res => res.json())
-                                        .then(data => ({ teamId, fixtures: data.response || [] }))
-                                        .catch(() => ({ teamId, fixtures: [] }))
-                                    );
-                                }
-                            }
-                        });
-                    });
-
-                    const last5Results = await Promise.all(last5Promises);
-
-                    // Process last 5 fixtures to calculate REAL stats
-                    last5Results.forEach(({ teamId, fixtures }) => {
-                        const finishedGames = fixtures.filter(f => f.fixture.status.short === 'FT');
-                        
-                        if (finishedGames.length === 0) {
-                            last5Lookup[teamId] = { homeStats: null, awayStats: null };
-                            return;
-                        }
-
-                        // Separate home and away - take last 5 of EACH type
-                        const homeGames = finishedGames
-                            .filter(f => f.teams.home.id === teamId)
-                            .slice(-5);  // Last 5 HOME games
-                        const awayGames = finishedGames
-                            .filter(f => f.teams.away.id === teamId)
-                            .slice(-5);  // Last 5 AWAY games
-
-                        const calcStats = (games, isHome, teamId) => {
-                            if (games.length === 0) return null;
-                            
-                            console.log('=== CALCULATING STATS ===');
-                            console.log('Team ID:', teamId);
-                            console.log('isHome:', isHome, '(looking for', isHome ? 'HOME' : 'AWAY', 'games)');
-                            console.log('Games count:', games.length);
-                            
-                            let totalGoals = 0, scoredCount = 0, concededCount = 0, bttsCount = 0;
-                            let over15 = 0, over25 = 0, over35 = 0;
-
-                            games.forEach(g => {
-                                const goalsFor = isHome ? g.goals.home : g.goals.away;
-                                const goalsAgainst = isHome ? g.goals.away : g.goals.home;
-                                const total = goalsFor + goalsAgainst;
-
-                                const teamName = isHome ? g.teams.home.name : g.teams.away.name;
-                                console.log(`${g.teams.home.name} ${g.goals.home}-${g.goals.away} ${g.teams.away.name} | Team: ${teamName} | Total: ${total} | O2.5: ${total > 2.5 ? 'YES' : 'NO'}`);
-
-                                totalGoals += total;
-                                if (goalsFor > 0) scoredCount++;
-                                if (goalsAgainst > 0) concededCount++;
-                                if (goalsFor > 0 && goalsAgainst > 0) bttsCount++;
-                                if (total > 1.5) over15++;
-                                if (total > 2.5) over25++;
-                                if (total > 3.5) over35++;
-                            });
-
-                            console.log('Over 1.5:', over15, 'Over 2.5:', over25, 'Over 3.5:', over35);
-                            console.log('O2.5 =', over25, '/', games.length, '=', Math.round((over25 / games.length) * 100) + '%');
-
-                            return {
-                                over15: Math.round((over15 / games.length) * 100),
-                                over25: Math.round((over25 / games.length) * 100),
-                                over35: Math.round((over35 / games.length) * 100),
-                                btts: Math.round((bttsCount / games.length) * 100),
-                                scored: Math.round((scoredCount / games.length) * 100),
-                                conceded: Math.round((concededCount / games.length) * 100),
-                                avgGoals: (totalGoals / games.length).toFixed(1)
-                            };
-                        };
-
-                        const stats = {
-                            homeStats: calcStats(homeGames, true, teamId),
-                            awayStats: calcStats(awayGames, false, teamId)
-                        };
-
-                        last5Lookup[teamId] = stats;
-                        
-                        // Cache it
-                        const cacheKey = getCacheKey('last5', teamId);
-                        setCache(cacheKey, stats);
-                    });
-
-                    setLast5Data(last5Lookup);
-                    setLastUpdate(new Date());
-                    
                 } catch (err) {
-                    console.error('API Error:', err);
-                    setError(err.message || 'Failed to load data');
+                    console.error('Error:', err);
+                    alert('Error: ' + err.message);
                 } finally {
                     setLoading(false);
                 }
             };
 
             useEffect(() => {
-                fetchData();
-            }, [selectedLeague, selectedDate]);
+                fetchWolvesArsenal();
+            }, []);
 
-            // Enhanced prediction calculator with H2H and weighted recent form
-            const calculateProbabilities = (homeTeamId, awayTeamId, filterType = 'season') => {
-                const homeData = standings[homeTeamId];
-                const awayData = standings[awayTeamId];
-                const h2hKey = `${homeTeamId}-${awayTeamId}`;
-                const h2hMatches = h2hData[h2hKey] || [];
-                
-                if (!homeData || !awayData) {
-                    return { homeWin: 45, draw: 25, awayWin: 30, btts: 55, homeBttsWin: 25, awayBttsWin: 17 };
-                }
+            const GamesList = ({ games, teamName, isHome }) => {
+                let over15 = 0, over25 = 0, over35 = 0;
 
-                // Calculate goals per game
-                const homeAttackHome = homeData.played > 0 ? (homeData.homeGoalsFor / (homeData.played / 2)) : 0;
-                const homeDefenseHome = homeData.played > 0 ? (homeData.homeGoalsAgainst / (homeData.played / 2)) : 0;
-                const awayAttackAway = awayData.played > 0 ? (awayData.awayGoalsFor / (awayData.played / 2)) : 0;
-                const awayDefenseAway = awayData.played > 0 ? (awayData.awayGoalsAgainst / (awayData.played / 2)) : 0;
-
-                // === 1. RECENT FORM ANALYSIS (Weighted) ===
-                const getWeightedFormScore = (formString) => {
-                    if (!formString) return 0;
-                    const results = formString.slice(-5).split('');
-                    let score = 0;
-                    // Weight: Most recent game = 5x, oldest = 1x
-                    results.forEach((result, index) => {
-                        const weight = index + 1; // 1, 2, 3, 4, 5
-                        if (result === 'W') score += 3 * weight;
-                        else if (result === 'D') score += 1 * weight;
-                    });
-                    return score / 45; // Max possible: (3*1 + 3*2 + 3*3 + 3*4 + 3*5) = 45
-                };
-                
-                const homeFormScore = getWeightedFormScore(homeData.form);
-                const awayFormScore = getWeightedFormScore(awayData.form);
-                const formDifference = (homeFormScore - awayFormScore) * 100; // -100 to +100
-
-                // === 2. HEAD-TO-HEAD ANALYSIS ===
-                let h2hHomeWins = 0;
-                let h2hDraws = 0;
-                let h2hAwayWins = 0;
-                let h2hBttsCount = 0;
-                let h2hTotalGoals = 0;
-                let h2hAtVenue = 0;
-                let h2hHomeWinsAtVenue = 0;
-                
-                h2hMatches.forEach(match => {
-                    const homeGoals = match.teams.home.id === homeTeamId ? match.goals.home : match.goals.away;
-                    const awayGoals = match.teams.away.id === awayTeamId ? match.goals.away : match.goals.home;
-                    
-                    const atHomeVenue = match.teams.home.id === homeTeamId;
-                    
-                    if (homeGoals > awayGoals) {
-                        h2hHomeWins++;
-                        if (atHomeVenue) h2hHomeWinsAtVenue++;
-                    } else if (homeGoals < awayGoals) {
-                        h2hAwayWins++;
-                    } else {
-                        h2hDraws++;
-                    }
-                    
-                    if (homeGoals > 0 && awayGoals > 0) h2hBttsCount++;
-                    h2hTotalGoals += (homeGoals + awayGoals);
-                    if (atHomeVenue) h2hAtVenue++;
-                });
-                
-                const h2hTotal = h2hMatches.length;
-                const h2hHomeWinRate = h2hTotal > 0 ? (h2hHomeWins / h2hTotal) * 100 : 50;
-                const h2hAwayWinRate = h2hTotal > 0 ? (h2hAwayWins / h2hTotal) * 100 : 30;
-                const h2hDrawRate = h2hTotal > 0 ? (h2hDraws / h2hTotal) * 100 : 20;
-                const h2hBttsRate = h2hTotal > 0 ? (h2hBttsCount / h2hTotal) * 100 : 50;
-
-                // === 3. LEAGUE POSITION & EXPECTED GOALS ===
-                const homeAdvantage = 12;
-                const homeExpectedGoals = (homeAttackHome + awayDefenseAway) / 2;
-                const awayExpectedGoals = (awayAttackAway + homeDefenseHome) / 2;
-                const goalDifference = (homeExpectedGoals - awayExpectedGoals) * 5;
-                
-                const positionDiff = awayData.position - homeData.position;
-                const positionBonus = positionDiff * 0.5;
-
-                // === 4. CALCULATE WIN PROBABILITIES ===
-                // Adjust weighting based on filter type
-                let formWeight, h2hWeight, positionWeight, goalsWeight;
-                
-                if (filterType === 'last5') {
-                    // Last 5 Games mode: Emphasize recent form heavily
-                    formWeight = 0.40;  // 40% form (up from 25%)
-                    h2hWeight = 0.15;   // 15% H2H (down from 20%)
-                    positionWeight = 0.10; // 10% position (down from 15%)
-                    goalsWeight = 1.0;  // 35% goals (up from 28%)
-                } else {
-                    // Season mode: Balanced approach
-                    formWeight = 0.25;  // 25% form
-                    h2hWeight = 0.20;   // 20% H2H
-                    positionWeight = 0.15; // 15% position
-                    goalsWeight = 0.56; // 28% goals (5 * 0.56 = 2.8% per goal diff)
-                }
-                
-                let homeWin = 40; // Base
-                homeWin += homeAdvantage; // +12%
-                homeWin += positionBonus * (positionWeight / 0.15); // Adjusted position impact
-                homeWin += (formDifference * formWeight); // Adjusted form impact
-                homeWin += ((h2hHomeWinRate - 33) * h2hWeight); // Adjusted H2H
-                homeWin += goalDifference * goalsWeight; // Adjusted goals impact
-                
-                let awayWin = 40; // Base
-                awayWin -= positionBonus * (positionWeight / 0.15);
-                awayWin -= (formDifference * formWeight);
-                awayWin += ((h2hAwayWinRate - 33) * h2hWeight);
-                awayWin -= goalDifference * goalsWeight;
-                
-                // Apply limits
-                homeWin = Math.max(15, Math.min(85, homeWin));
-                awayWin = Math.max(10, Math.min(70, awayWin));
-                
-                let draw = 100 - homeWin - awayWin;
-                draw = Math.max(10, Math.min(35, draw));
-                
-                // Normalize to 100%
-                const total = homeWin + draw + awayWin;
-                homeWin = Math.round((homeWin / total) * 100);
-                awayWin = Math.round((awayWin / total) * 100);
-                draw = 100 - homeWin - awayWin;
-
-                // === 5. IMPROVED BTTS CALCULATION ===
-                // P(home scores) × P(away scores) with defensive adjustments
-
-                // How often does home team score at home? (as a probability 0-1)
-                const homeScoreRate = homeAttackHome > 0 
-                    ? Math.min(0.95, homeAttackHome / 2.5) 
-                    : 0.5;
-
-                // How often does away team score away? (as a probability 0-1)
-                const awayScoreRate = awayAttackAway > 0 
-                    ? Math.min(0.95, awayAttackAway / 2.5) 
-                    : 0.5;
-
-                // Defensive strength (0-1, higher = weaker defense)
-                // Average goals conceded per game scaled against league average of 1.2
-                const homeDefenseWeakness = Math.min(1.5, homeDefenseHome / 1.2);
-                const awayDefenseWeakness = Math.min(1.5, awayDefenseAway / 1.2);
-
-                // Adjust scoring probability based on opponent's defense
-                // Strong defense (weakness < 1) reduces scoring chance
-                // Weak defense (weakness > 1) increases scoring chance
-                let adjHomeScoreProb, adjAwayScoreProb;
-
-                if (filterType === 'last5') {
-                    // Last 5 mode - use weighted form score to estimate scoring
-                    adjHomeScoreProb = Math.min(0.95, (0.5 + homeFormScore * 0.45) * awayDefenseWeakness);
-                    adjAwayScoreProb = Math.min(0.95, (0.5 + awayFormScore * 0.45) * homeDefenseWeakness);
-                } else {
-                    // Season mode - use actual goals data adjusted for opponent defense
-                    adjHomeScoreProb = Math.min(0.95, homeScoreRate * awayDefenseWeakness);
-                    adjAwayScoreProb = Math.min(0.95, awayScoreRate * homeDefenseWeakness);
-                }
-
-                // True BTTS = P(home scores) × P(away scores)
-                const seasonBtts = Math.round(adjHomeScoreProb * adjAwayScoreProb * 100);
-
-                // Blend with H2H BTTS history
-                const h2hBlendWeight = filterType === 'last5' ? 0.25 : 0.30;
-                const btts = h2hTotal > 0
-                    ? Math.round(seasonBtts * (1 - h2hBlendWeight) + h2hBttsRate * h2hBlendWeight)
-                    : seasonBtts;
-
-                // === 6. LATE GOAL PREDICTION ===
-                const homeEvents = eventsData[homeTeamId];
-                const awayEvents = eventsData[awayTeamId];
-                const homeLateGoalPct = homeEvents ? homeEvents.lateGoalScoredPct : 25;
-                const awayLateGoalPct = awayEvents ? awayEvents.lateGoalScoredPct : 25;
-                
-                // Combined probability of a late goal (either team)
-                const lateGoal = Math.min(95, Math.round((homeLateGoalPct + awayLateGoalPct) / 1.5));
-
-                return {
-                    homeWin,
-                    draw,
-                    awayWin,
-                    btts,
-                    lateGoal,
-                    homeBttsWin: Math.round((homeWin / 100) * (btts / 100) * 100),
-                    awayBttsWin: Math.round((awayWin / 100) * (btts / 100) * 100),
-                    h2hStats: h2hTotal > 0 ? {
-                        total: h2hTotal,
-                        homeWins: h2hHomeWins,
-                        draws: h2hDraws,
-                        awayWins: h2hAwayWins,
-                        bttsRate: Math.round(h2hBttsRate),
-                        avgGoals: h2hTotal > 0 ? (h2hTotalGoals / h2hTotal).toFixed(1) : '0.0'
-                    } : null
-                };
-            };
-
-            // Calculate team stats - ONLY from last 5 games (no season data)
-            const getTeamStats = (teamId, isHome) => {
-                const last5 = last5Data[teamId];
-                const events = eventsData[teamId];
-                
-                // Always use last 5 data
-                if (last5) {
-                    const stats = isHome ? last5.homeStats : last5.awayStats;
-                    
-                    if (stats) {
-                        return {
-                            ...stats,
-                            late: events ? (isHome ? events.lateHomeGoalPct : events.lateAwayGoalPct) : 0
-                        };
-                    }
-                }
-                
-                // Fallback if no data available yet
-                return { 
-                    over15: 0, 
-                    over25: 0, 
-                    over35: 0, 
-                    btts: 0, 
-                    scored: 0, 
-                    conceded: 0, 
-                    late: 0 
-                };
-            };
-
-            const StatusBadge = ({ status }) => {
-                const statusMap = {
-                    'NS': { label: 'Upcoming', color: 'bg-blue-600' },
-                    'TBD': { label: 'TBD', color: 'bg-blue-600' },
-                    'FT': { label: 'FT', color: 'bg-gray-700' },
-                    '1H': { label: 'Live', color: 'bg-green-600 animate-pulse' },
-                    '2H': { label: 'Live', color: 'bg-green-600 animate-pulse' },
-                    'HT': { label: 'HT', color: 'bg-yellow-600' },
-                    'LIVE': { label: 'Live', color: 'bg-green-600 animate-pulse' },
-                };
-                const info = statusMap[status] || { label: status, color: 'bg-gray-600' };
-                return <span className={`px-2 py-1 ${info.color} text-white text-xs rounded-full font-medium`}>{info.label}</span>;
-            };
-
-            // Injury Panel Component - uses Claude AI with web search
-            const InjuryPanel = ({ homeTeam, awayTeam, fixtureId }) => {
-                const [injuryData, setInjuryData] = React.useState(null);
-                const [loading, setLoading] = React.useState(false);
-                const [error, setError] = React.useState(null);
-
-                const fetchInjuries = async () => {
-                    setLoading(true);
-                    setError(null);
-                    try {
-                        const response = await fetch('https://api.anthropic.com/v1/messages', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                model: 'claude-sonnet-4-20250514',
-                                max_tokens: 1000,
-                                tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-                                messages: [{
-                                    role: 'user',
-                                    content: `Search for the latest injury and suspension news for ${homeTeam} and ${awayTeam} football teams right now in 2025.
-
-Return ONLY a JSON object with NO markdown, NO backticks, NO explanation. Just raw JSON like this:
-{
-  "home": {
-    "team": "${homeTeam}",
-    "injuries": [
-      {"player": "Player Name", "status": "Out/Doubtful/Returning", "role": "Key Player/Squad Player", "impact": "high/medium/low"}
-    ],
-    "summary": "One sentence summary",
-    "rating": "red/yellow/green"
-  },
-  "away": {
-    "team": "${awayTeam}",
-    "injuries": [
-      {"player": "Player Name", "status": "Out/Doubtful/Returning", "role": "Key Player/Squad Player", "impact": "high/medium/low"}
-    ],
-    "summary": "One sentence summary", 
-    "rating": "red/yellow/green"
-  }
-}
-
-Rating guide: red = key player(s) out, yellow = minor injuries only, green = fully fit.
-If no injuries found, return empty injuries array and green rating.`
-                                }]
-                            })
-                        });
-
-                        const data = await response.json();
-
-                        // Extract text from response (handle tool use blocks)
-                        const text = data.content
-                            .filter(b => b.type === 'text')
-                            .map(b => b.text)
-                            .join('');
-
-                        // Clean and parse JSON
-                        const clean = text.replace(/```json|```/g, '').trim();
-                        const parsed = JSON.parse(clean);
-                        setInjuryData(parsed);
-                    } catch (err) {
-                        setError('Could not load injury data. Try again.');
-                        console.error('Injury fetch error:', err);
-                    } finally {
-                        setLoading(false);
-                    }
-                };
-
-                const RatingBadge = ({ rating }) => {
-                    const config = {
-                        red: { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-700', icon: '🔴', label: 'Key Injuries' },
-                        yellow: { bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-700', icon: '🟡', label: 'Minor Injuries' },
-                        green: { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-700', icon: '🟢', label: 'Fully Fit' },
-                    };
-                    const c = config[rating] || config.green;
-                    return (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${c.bg} ${c.border} ${c.text} border`}>
-                            {c.icon} {c.label}
-                        </span>
-                    );
-                };
-
-                const TeamInjuries = ({ teamData }) => (
-                    <div className="flex-1">
-                        <div className="flex items-center gap-1 mb-1">
-                            <span className="text-xs font-bold text-gray-700 truncate">{teamData.team}</span>
-                            <RatingBadge rating={teamData.rating} />
-                        </div>
-                        {teamData.injuries?.length > 0 ? (
-                            <ul className="space-y-0.5">
-                                {teamData.injuries.map((inj, i) => (
-                                    <li key={i} className="text-xs flex items-start gap-1">
-                                        <span>{inj.impact === 'high' ? '🔴' : inj.impact === 'medium' ? '🟡' : '⚪'}</span>
-                                        <span>
-                                            <span className="font-semibold">{inj.player}</span>
-                                            <span className="text-gray-500"> · {inj.status}</span>
-                                            {inj.impact === 'high' && <span className="text-red-600 font-semibold"> ★</span>}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
+                return (
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <h3 className="font-bold mb-3">
+                            {isHome ? '🏠' : '✈️'} {teamName} - Last 5 {isHome ? 'HOME' : 'AWAY'} Games
+                        </h3>
+                        
+                        {games.length === 0 ? (
+                            <p className="text-gray-500">No games found</p>
                         ) : (
-                            <p className="text-xs text-green-600">✅ No injuries reported</p>
-                        )}
-                        <p className="text-xs text-gray-500 mt-1 italic">{teamData.summary}</p>
-                    </div>
-                );
+                            <div className="space-y-2">
+                                {games.map((g, i) => {
+                                    const total = g.goals.home + g.goals.away;
+                                    const o15 = total > 1.5;
+                                    const o25 = total > 2.5;
+                                    const o35 = total > 3.5;
+                                    
+                                    if (o15) over15++;
+                                    if (o25) over25++;
+                                    if (o35) over35++;
 
-                return (
-                    <div className="mt-2 pt-2 border-t">
-                        {!injuryData && !loading && (
-                            <button
-                                onClick={fetchInjuries}
-                                className="w-full py-2 px-3 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                            >
-                                🏥 Check Injury & Suspension News (AI)
-                            </button>
-                        )}
-
-                        {loading && (
-                            <div className="flex items-center justify-center gap-2 py-3 text-xs text-gray-500">
-                                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                Searching latest injury news...
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="text-xs text-red-600 text-center py-2">
-                                {error}
-                                <button onClick={fetchInjuries} className="ml-2 underline">Retry</button>
-                            </div>
-                        )}
-
-                        {injuryData && (
-                            <div>
-                                <div className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1">
-                                    🏥 Injury & Suspension News
-                                    <button onClick={fetchInjuries} className="ml-auto text-blue-500 underline font-normal">Refresh</button>
-                                </div>
-                                <div className="flex gap-3">
-                                    <TeamInjuries teamData={injuryData.home} />
-                                    <div className="w-px bg-gray-200"></div>
-                                    <TeamInjuries teamData={injuryData.away} />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
-            const MatchCard = ({ match }) => {
-                const homeTeamId = match.teams.home.id;
-                const awayTeamId = match.teams.away.id;
-                const homeStats = getTeamStats(homeTeamId, true, statsFilter);
-                const awayStats = getTeamStats(awayTeamId, false, statsFilter);
-                const prob = calculateProbabilities(homeTeamId, awayTeamId, statsFilter);
-
-                const homeScore = match.goals.home;
-                const awayScore = match.goals.away;
-                const status = match.fixture.status.short;
-
-                return (
-                    <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-4">
-                        <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                            <div className="text-sm font-semibold">
-                                ⏰ {new Date(match.fixture.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                            <StatusBadge status={status} />
-                        </div>
-
-                        {/* Predictions with H2H info */}
-                        <div className="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-gray-200">
-                            <div className="flex justify-between items-center mb-2">
-                                <div className="text-xs font-bold text-gray-700">🎯 PREDICTIONS</div>
-                                {prob.h2hStats && (
-                                    <div className="text-xs text-gray-600">
-                                        H2H Home Team Form: {prob.h2hStats.homeWins}W-{prob.h2hStats.draws}D-{prob.h2hStats.awayWins}L (Last {prob.h2hStats.total})
-                                    </div>
-                                )}
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-2 mb-2">
-                                <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
-                                    <div className="text-xs text-green-700">Home</div>
-                                    <div className="text-lg font-bold text-green-700">{prob.homeWin}%</div>
-                                </div>
-                                <div className="bg-yellow-100 border border-yellow-300 rounded p-2 text-center">
-                                    <div className="text-xs text-yellow-700">Draw</div>
-                                    <div className="text-lg font-bold text-yellow-700">{prob.draw}%</div>
-                                </div>
-                                <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
-                                    <div className="text-xs text-red-700">Away</div>
-                                    <div className="text-lg font-bold text-red-700">{prob.awayWin}%</div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2 mb-1">
-                                <div className="bg-green-100 border border-green-300 rounded p-2 text-center">
-                                    <div className="text-xs text-green-700">Home BTTS+W</div>
-                                    <div className="text-sm font-bold text-green-700">{prob.homeBttsWin}%</div>
-                                </div>
-                                <div className="bg-purple-100 border border-purple-300 rounded p-2 text-center">
-                                    <div className="text-xs text-purple-700">BTTS</div>
-                                    <div className="text-sm font-bold text-purple-700">{prob.btts}%</div>
-                                </div>
-                                <div className="bg-red-100 border border-red-300 rounded p-2 text-center">
-                                    <div className="text-xs text-red-700">Away BTTS+W</div>
-                                    <div className="text-sm font-bold text-red-700">{prob.awayBttsWin}%</div>
-                                </div>
-                            </div>
-                            
-                            {/* Late Goal Prediction */}
-                            <div className="grid grid-cols-3 gap-2">
-                                <div className="bg-orange-50 border border-orange-200 rounded p-2 text-center">
-                                    <div className="text-xs text-orange-600">🏠 Late Goals</div>
-                                    <div className="text-sm font-bold text-orange-600">{eventsData[homeTeamId]?.lateGoalScoredPct ?? '—'}%</div>
-                                    <div className="text-xs text-gray-400">at home</div>
-                                </div>
-                                <div className="bg-orange-100 border border-orange-300 rounded p-2 text-center">
-                                    <div className="text-xs text-orange-700">⏰ Late Goal (75'+)</div>
-                                    <div className="text-sm font-bold text-orange-700">{prob.lateGoal}%</div>
-                                </div>
-                                <div className="bg-orange-50 border border-orange-200 rounded p-2 text-center">
-                                    <div className="text-xs text-orange-600">✈️ Late Goals</div>
-                                    <div className="text-sm font-bold text-orange-600">{eventsData[awayTeamId]?.lateGoalScoredPct ?? '—'}%</div>
-                                    <div className="text-xs text-gray-400">away</div>
-                                </div>
-                            </div>
-                            
-                            {prob.h2hStats && (
-                                <div className="text-xs text-center text-gray-600 mt-2">
-                                    H2H Avg: {prob.h2hStats.avgGoals} goals | BTTS: {prob.h2hStats.bttsRate}%
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs border-collapse">
-                                <thead>
-                                    <tr className="bg-gray-200">
-                                        <th className="table-header text-left pl-3 sticky left-0 bg-gray-200">Team</th>
-                                        <th className="table-header">O1.5</th>
-                                        <th className="table-header">O2.5</th>
-                                        <th className="table-header">O3.5</th>
-                                        <th className="table-header">BTTS</th>
-                                        <th className="table-header">Scored</th>
-                                        <th className="table-header">Conc</th>
-                                        <th className="table-header">Late</th>
-                                        {homeScore !== null && <th className="table-header">Score</th>}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr className="border-b border-gray-200 hover:bg-blue-50">
-                                        <td className="team-cell text-left sticky left-0 bg-white flex items-center gap-2">
-                                            {match.teams.home.logo && <img src={match.teams.home.logo} alt="" className="w-5 h-5" />}
-                                            <span className="text-blue-700">🏠 {match.teams.home.name}</span>
-                                        </td>
-                                        <td className="stat-cell text-blue-700" title={`Based on ${last5Data[homeTeamId]?.homeStats ? 'real' : 'estimated'} data`}>
-                                            {homeStats.over15}%
-                                        </td>
-                                        <td className="stat-cell text-blue-700">{homeStats.over25}%</td>
-                                        <td className="stat-cell text-blue-700">{homeStats.over35}%</td>
-                                        <td className="stat-cell text-purple-700">{homeStats.btts}%</td>
-                                        <td className="stat-cell text-green-700">{homeStats.scored}%</td>
-                                        <td className="stat-cell text-red-700">{homeStats.conceded}%</td>
-                                        <td className="stat-cell text-orange-700 font-bold">{homeStats.late}%</td>
-                                        {homeScore !== null && (
-                                            <td className="stat-cell text-blue-700 font-bold text-base">{homeScore}</td>
-                                        )}
-                                    </tr>
-
-                                    <tr className="hover:bg-red-50">
-                                        <td className="team-cell text-left sticky left-0 bg-white flex items-center gap-2">
-                                            {match.teams.away.logo && <img src={match.teams.away.logo} alt="" className="w-5 h-5" />}
-                                            <span className="text-red-700">✈️ {match.teams.away.name}</span>
-                                        </td>
-                                        <td className="stat-cell text-blue-700">{awayStats.over15}%</td>
-                                        <td className="stat-cell text-blue-700">{awayStats.over25}%</td>
-                                        <td className="stat-cell text-blue-700">{awayStats.over35}%</td>
-                                        <td className="stat-cell text-purple-700">{awayStats.btts}%</td>
-                                        <td className="stat-cell text-green-700">{awayStats.scored}%</td>
-                                        <td className="stat-cell text-red-700">{awayStats.conceded}%</td>
-                                        <td className="stat-cell text-orange-700 font-bold">{awayStats.late}%</td>
-                                        {awayScore !== null && (
-                                            <td className="stat-cell text-red-700 font-bold text-base">{awayScore}</td>
-                                        )}
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Form Section */}
-                        <div className="p-3 bg-gray-50 border-t">
-                            {/* Row 1: Last 5 Home Games - always from standings (instant, no dependency) */}
-                            <div className="grid grid-cols-2 gap-3 mb-2">
-                                <div className="text-center">
-                                    <div className="text-xs font-semibold text-blue-700 mb-1">🏠 Last 5 Home Games</div>
-                                    <div className="flex justify-center gap-0.5">
-                                        {(standings[homeTeamId]?.form || '').slice(-5).split('').filter(Boolean).map((r, i) => (
-                                            <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-xs font-semibold text-red-700 mb-1">✈️ Last 5 Away Games</div>
-                                    <div className="flex justify-center gap-0.5">
-                                        {(standings[awayTeamId]?.form || '').slice(-5).split('').filter(Boolean).map((r, i) => (
-                                            <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Row 2: Last 5 All Games - always from standings (instant) */}
-                            <div className="grid grid-cols-2 gap-3 mb-2">
-                                <div className="text-center">
-                                    <div className="text-xs font-semibold text-gray-600 mb-1">📊 Last 5 All Games</div>
-                                    <div className="flex justify-center gap-0.5">
-                                        {(standings[homeTeamId]?.form || '').slice(-5).split('').filter(Boolean).map((r, i) => (
-                                            <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="text-center">
-                                    <div className="text-xs font-semibold text-gray-600 mb-1">📊 Last 5 All Games</div>
-                                    <div className="flex justify-center gap-0.5">
-                                        {(standings[awayTeamId]?.form || '').slice(-5).split('').filter(Boolean).map((r, i) => (
-                                            <span key={i} className={`inline-flex w-5 h-5 items-center justify-center rounded text-white text-xs font-bold ${r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'}`}>{r}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Venue */}
-                            {match.fixture.venue && (
-                                <div className="text-xs text-gray-600 text-center pt-2 border-t">
-                                    🏟️ {match.fixture.venue.name}
-                                    {last5Data[homeTeamId] && (
-                                        <div className="text-xs text-gray-400 mt-1">
-                                            Debug: Home avg {last5Data[homeTeamId].homeStats?.avgGoals || '?'} goals | 
-                                            Away avg {last5Data[awayTeamId]?.awayStats?.avgGoals || '?'} goals
+                                    return (
+                                        <div key={i} className="border-b pb-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm">
+                                                    {g.teams.home.name} <span className="font-bold">{g.goals.home}-{g.goals.away}</span> {g.teams.away.name}
+                                                </span>
+                                                <span className="text-sm font-mono">
+                                                    Total: {total}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                O1.5: {o15 ? '✅' : '❌'} | 
+                                                O2.5: {o25 ? '✅' : '❌'} | 
+                                                O3.5: {o35 ? '✅' : '❌'}
+                                            </div>
                                         </div>
-                                    )}
+                                    );
+                                })}
+                                
+                                <div className="mt-4 p-3 bg-blue-50 rounded">
+                                    <div className="font-bold text-blue-900 mb-2">Calculated Percentages:</div>
+                                    <div className="text-sm">
+                                        O1.5: {over15}/{games.length} = <span className="font-bold">{Math.round((over15/games.length)*100)}%</span>
+                                    </div>
+                                    <div className="text-sm">
+                                        O2.5: {over25}/{games.length} = <span className="font-bold">{Math.round((over25/games.length)*100)}%</span>
+                                    </div>
+                                    <div className="text-sm">
+                                        O3.5: {over35}/{games.length} = <span className="font-bold">{Math.round((over35/games.length)*100)}%</span>
+                                    </div>
                                 </div>
-                            )}
-
-                            {/* Injury Analysis */}
-                            <InjuryPanel 
-                                homeTeam={match.teams.home.name}
-                                awayTeam={match.teams.away.name}
-                                fixtureId={match.fixture.id}
-                            />
-                        </div>
+                            </div>
+                        )}
                     </div>
                 );
             };
 
             return (
-                <div className="min-h-screen pb-6">
-                    <div className="max-w-6xl mx-auto px-3 pt-4">
-                        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-3 rounded-xl mb-4 text-center shadow-lg">
-                            <div className="font-bold text-sm">🎉 LIVE DATA - 2025/26 Season</div>
-                            <div className="text-xs opacity-90 mt-1">
-                                {lastUpdate && `Last updated: ${lastUpdate.toLocaleTimeString()}`}
+                <div className="max-w-4xl mx-auto">
+                    <div className="bg-white rounded-lg shadow p-4 mb-4">
+                        <h1 className="text-xl font-bold mb-2">Raw Data Debug - Wolves vs Arsenal</h1>
+                        <p className="text-sm text-gray-600 mb-3">
+                            Shows actual last 5 HOME games for Wolves and last 5 AWAY games for Arsenal
+                        </p>
+                        <button 
+                            onClick={fetchWolvesArsenal}
+                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                            disabled={loading}
+                        >
+                            {loading ? 'Loading...' : 'Refresh Data'}
+                        </button>
+                    </div>
+
+                    {loading && <div className="text-center text-gray-600">Loading...</div>}
+
+                    {match && (
+                        <div className="bg-green-100 border border-green-400 rounded-lg p-3 mb-4">
+                            <div className="font-bold text-center">
+                                {match.teams.home.name} vs {match.teams.away.name}
+                            </div>
+                            <div className="text-sm text-center text-gray-600">
+                                {new Date(match.fixture.date).toLocaleString()}
                             </div>
                         </div>
+                    )}
 
-                        <div className="bg-white rounded-2xl shadow-xl p-4 mb-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="text-2xl">⚽</div>
-                                    <h1 className="text-xl font-bold">Live Football Stats</h1>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => {
-                                            // Clear all cache
-                                            const today = new Date().toISOString().split('T')[0];
-                                            Object.keys(localStorage).forEach(key => {
-                                                if (key.includes(today) || key.includes('last5') || key.includes('_202')) {
-                                                    localStorage.removeItem(key);
-                                                }
-                                            });
-                                            fetchData();
-                                        }}
-                                        className="text-xs px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                                        disabled={loading}
-                                    >
-                                        🗑️ Clear Cache
-                                    </button>
-                                    <button
-                                        onClick={fetchData}
-                                        className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                        disabled={loading}
-                                    >
-                                        {loading ? '↻' : '🔄'} Refresh
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Stats info - always Last 5 Games */}
-                            <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                                <span className="text-xs font-semibold text-blue-700">📊 Stats View: Last 5 Games (Real Data)</span>
-                            </div>
-                            
-                            <div className="mb-3">
-                                <div className="text-xs font-semibold text-gray-600 mb-2">Select League:</div>
-                                <div className="flex gap-2 overflow-x-auto pb-2">
-                                    {Object.entries(leagues).map(([id, league]) => (
-                                        <button
-                                            key={id}
-                                            onClick={() => setSelectedLeague(id)}
-                                            className={`px-3 py-2 rounded-xl font-semibold text-xs whitespace-nowrap transition-all ${
-                                                selectedLeague === id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                        >
-                                            {league.flag} {league.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <div className="flex gap-2 pb-2">
-                                    {dates.map(({ date, label }) => (
-                                        <button
-                                            key={date}
-                                            onClick={() => setSelectedDate(date)}
-                                            className={`px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap ${
-                                                selectedDate === date ? 'active-date' : 'bg-gray-100'
-                                            }`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {loading && (
-                            <div className="text-center py-12">
-                                <div className="inline-block w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                <p className="mt-4 text-gray-600">Loading matches...</p>
-                            </div>
-                        )}
-
-                        {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-4">
-                                <div className="font-bold mb-2">⚠️ Error</div>
-                                <div className="text-sm">{error}</div>
-                            </div>
-                        )}
-
-                        {!loading && !error && matches.length === 0 && (
-                            <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-                                <div className="text-4xl mb-3">📅</div>
-                                <h3 className="text-lg font-semibold mb-2">No matches scheduled</h3>
-                                <p className="text-sm text-gray-600">Try a different date or league</p>
-                            </div>
-                        )}
-
-                        {!loading && matches.length > 0 && (
-                            <div>
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                                    ✅ {matches.length} match{matches.length !== 1 ? 'es' : ''} • Live data from API-Football
-                                </div>
-                                {matches.map(match => (
-                                    <MatchCard key={match.fixture.id} match={match} />
-                                ))}
-                            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {match && (
+                            <>
+                                <GamesList games={homeGames} teamName={match.teams.home.name} isHome={true} />
+                                <GamesList games={awayGames} teamName={match.teams.away.name} isHome={false} />
+                            </>
                         )}
                     </div>
                 </div>
             );
         };
 
-        ReactDOM.render(<FootballApp />, document.getElementById('root'));
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
+    
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
