@@ -937,7 +937,9 @@ If no injuries found, return empty injuries array and green rating.`
                                             {match.teams.home.logo && <img src={match.teams.home.logo} alt="" className="w-5 h-5" />}
                                             <span className="text-blue-700">🏠 {match.teams.home.name}</span>
                                         </td>
-                                        <td className="stat-cell text-blue-700">{homeStats.over15}%</td>
+                                        <td className="stat-cell text-blue-700" title={`Based on ${last5Data[homeTeamId]?.homeStats ? 'real' : 'estimated'} data`}>
+                                            {homeStats.over15}%
+                                        </td>
                                         <td className="stat-cell text-blue-700">{homeStats.over25}%</td>
                                         <td className="stat-cell text-blue-700">{homeStats.over35}%</td>
                                         <td className="stat-cell text-purple-700">{homeStats.btts}%</td>
@@ -1015,6 +1017,12 @@ If no injuries found, return empty injuries array and green rating.`
                             {match.fixture.venue && (
                                 <div className="text-xs text-gray-600 text-center pt-2 border-t">
                                     🏟️ {match.fixture.venue.name}
+                                    {last5Data[homeTeamId] && (
+                                        <div className="text-xs text-gray-400 mt-1">
+                                            Debug: Home avg {last5Data[homeTeamId].homeStats?.avgGoals || '?'} goals | 
+                                            Away avg {last5Data[awayTeamId]?.awayStats?.avgGoals || '?'} goals
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
