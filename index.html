@@ -113,9 +113,10 @@
                 setLoading(true);
                 setError(null);
                 
-                // Cache helpers - per day
+                // Cache helpers - per day with version
                 const today = new Date().toISOString().split('T')[0];
-                const getCacheKey = (type, id) => `${type}_${id}_${today}`;
+                const CACHE_VERSION = 'v3'; // Increment this to bust all caches
+                const getCacheKey = (type, id) => `${CACHE_VERSION}_${type}_${id}_${today}`;
                 const getCache = (key) => {
                     try {
                         const cached = localStorage.getItem(key);
